@@ -136,6 +136,19 @@
     align-items: center; justify-content: center; z-index: 100; padding: 24px;
   }
   .modal.open { display: flex; }
+  /* Editor modal: full-bleed dark backdrop with explicit-sized inner host so
+     image-editor's height:100% grid has something to fill. */
+  #editor-modal { background: rgba(0,0,0,0.85); padding: 0; z-index: 1000; }
+  #editor-modal.open { display: flex; }
+  .editor-host {
+    width: 95vw; height: 95vh;
+    background: #1a1d24;
+    border: 2px solid #5A3C1E; border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  }
+  .editor-host > .gpc-ie-root { flex: 1; min-height: 0; }
   .modal .box {
     background: #FBF5E0;
     border: 3px solid #5A3C1E; border-radius: 16px;
@@ -236,8 +249,8 @@
   .st-blocked { background:#8B5847; color:#FFF9E8; }
   .deny-reason { margin:8px 0; padding:10px; background:#FCE0E0; border-left:4px solid #C04040; color:#5A1818; font-size:12px; border-radius:6px; font-weight:500; }
 </style>
-<link rel="stylesheet" href="lib/image-editor.css?v=2">
-<script src="lib/image-editor.js?v=2"></script>
+<link rel="stylesheet" href="lib/image-editor.css?v=3">
+<script src="lib/image-editor.js?v=3"></script>
 </head>
 <body>
 <header>
@@ -940,8 +953,11 @@ function openEditor(id) {
   const modal = document.getElementById('editor-modal');
   modal.innerHTML = '';
   modal.classList.add('open');
+  const host = document.createElement('div');
+  host.className = 'editor-host';
+  modal.appendChild(host);
   activeEditor = window.ImageEditor.mount({
-    container: modal,
+    container: host,
     src: item.src,
     sourceName: item.name,
     onApply: async (out) => {
