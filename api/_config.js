@@ -10,7 +10,9 @@ export function readConfig() {
 
 export async function gh(token, repoPath, opts = {}) {
   const { owner, repo, branch = 'main' } = opts.github;
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${repoPath}${opts.ref ? `?ref=${opts.ref || branch}` : ''}`;
+  // URL-encode path segments (preserve slashes) to handle spaces, non-ASCII, etc.
+  const encodedPath = repoPath.split('/').map(encodeURIComponent).join('/');
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}${opts.ref ? `?ref=${opts.ref || branch}` : ''}`;
   const res = await fetch(url, {
     method: opts.method || 'GET',
     headers: {
