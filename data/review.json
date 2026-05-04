@@ -1,0 +1,308 @@
+{
+  "updated": "2026-05-01",
+  "items": [
+    {
+      "file": "ui-gem-badge.png",
+      "sourceDir": "www/assets/sliced/batch8",
+      "note": "Baked-in '99' text causes double-number display bug in-game; needs version without text",
+      "flaggedAt": "2026-04-28T12:26:17.710Z"
+    },
+    {
+      "file": "c3-bg-mushrooms.png",
+      "sourceDir": "www/assets/sliced/batch8",
+      "note": "",
+      "flaggedAt": "2026-04-28T15:34:51.654Z"
+    },
+    {
+      "file": "c3-bg-crystals.png",
+      "sourceDir": "www/assets/sliced/batch8",
+      "note": "",
+      "flaggedAt": "2026-04-28T15:34:52.666Z"
+    },
+    {
+      "file": "c2-void-zone-strip-8f.png",
+      "sourceDir": "www/assets/animations",
+      "note": "",
+      "flaggedAt": "2026-04-28T15:34:53.982Z"
+    },
+    {
+      "file": "c2-portal-rings-pair.png",
+      "sourceDir": "www/assets/batch2-generated",
+      "note": "",
+      "flaggedAt": "2026-04-28T15:34:57.342Z"
+    },
+    {
+      "file": "c3-flag.png",
+      "sourceDir": "www/assets/sliced/batch8",
+      "note": "",
+      "flaggedAt": "2026-04-28T15:34:59.925Z"
+    },
+    {
+      "file": "c3-flag-wave-8f.png",
+      "sourceDir": "www/assets/sliced/batch11",
+      "note": "",
+      "flaggedAt": "2026-04-28T15:35:23.017Z"
+    },
+    {
+      "file": "rope-segment.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-1-menu",
+      "note": "Inspection: stripes thicker than spec (#C9A86B + #2B1D12 fine pinstripes); horizontal-tile butt-edge test needed before approval",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:00:00.000Z",
+      "reviewer": "claude-opus-4-7",
+      "score": 7
+    },
+    {
+      "file": "hole-rim-c2.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-2-endgame",
+      "note": "REJECTED (Gemini score 3): Inner cup not transparent (opaque brown wall); palette wrong (too dark/saturated blue); painterly variable outline not crisp 2px ink",
+      "flaggedAt": "2026-05-01T00:21:32.278Z"
+    },
+    {
+      "file": "hole-rim-c3.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-2-endgame",
+      "note": "REJECTED (Gemini score 5): BG not transparent (light purple/gray fill); inner cup opaque gold/tan instead of transparent void; soft shadow rendered as purple glow",
+      "flaggedAt": "2026-05-01T00:21:37.150Z"
+    },
+    {
+      "file": "hole-rim-c4.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-2-endgame",
+      "note": "REJECTED (Gemini score 4): Uses real blur/glow shader (HARD RULE violation, paper strips required); 3D-render lighting feel; missing flat 2px ink outline",
+      "flaggedAt": "2026-05-01T00:21:38.670Z"
+    },
+    {
+      "file": "hole-rim-c5.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-2-endgame",
+      "note": "REJECTED (Gemini score 4): Stripe red instead of #FFB7D0 pink; inner cup opaque dark; BG not transparent (light gradient)",
+      "flaggedAt": "2026-05-01T00:21:39.785Z"
+    },
+    {
+      "file": "failed-card.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-2-endgame",
+      "note": "INSPECTION (Gemini score 6): Sad-face icon over-detailed (pig-like instead of dot eyes + arc mouth); card rotation applied to inner layers not whole card; bbox 443x331 vs spec 600x540; borderline — manual decide",
+      "flaggedAt": "2026-05-01T00:21:40.826Z"
+    },
+    {
+      "file": "tape-red.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-2-endgame",
+      "note": "REJECTED (Gemini score 3): Wet/glossy 3D-render feel not washi paper; large bubble spots not subtle grain; missing ink outline along edges",
+      "flaggedAt": "2026-05-01T00:21:41.944Z"
+    },
+    {
+      "file": "tape-blue.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-2-endgame",
+      "note": "REJECTED (Gemini score 2): BG not transparent (solid blue gradient); main color royal blue not steel #5577CC; no visible ink outline",
+      "flaggedAt": "2026-05-01T00:21:47.542Z"
+    },
+    {
+      "file": "c4-portal-neon.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-3-bg-identity",
+      "note": "REJECT: 3D plastic shell, real bloom/glow, math-perfect circle, no ink outline, no paper-strip neon. See forge/atlas-3-review-rejects.md.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:25:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 2
+    },
+    {
+      "file": "bg-c4-neon-ground-band.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-3-bg-identity",
+      "note": "REJECT: photorealistic synthwave with bloom/DOF, no paper-cut layers, no ink outline, tile-ability unclear. See forge/atlas-3-review-rejects.md.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:25:00Z",
+      "reviewer": "gemini-2.5-flash",
+      "score": 2
+    },
+    {
+      "file": "bg-ornament-lollipop.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-3-bg-identity",
+      "note": "REJECT: glossy 3D candy disc, math-perfect edges, sprinkles as glossy beads (not paper rects), no ink outline. See forge/atlas-3-review-rejects.md.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:25:00Z",
+      "reviewer": "gemini-2.5-flash",
+      "score": 3
+    },
+    {
+      "file": "bg-ornament-sprinkle-cloud.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-3-bg-identity",
+      "note": "REJECT: full 3D plastic blob, no ink outline, no wobble, sprinkles glossy not paper, no distinct cut-paper layers. See forge/atlas-3-review-rejects.md.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:25:00Z",
+      "reviewer": "gemini-2.5-flash",
+      "score": 0
+    },
+    {
+      "file": "bg-ornament-candy-banner.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-3-bg-identity",
+      "note": "REJECT: 3D glossy satin ribbon, clean modeled folds (no torn ends), heart as 3D sticker, no ink outline, no wobble. See forge/atlas-3-review-rejects.md.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:25:00Z",
+      "reviewer": "gemini-2.5-flash",
+      "score": 1
+    },
+    {
+      "file": "c2-wind-river-still.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-3-bg-identity",
+      "note": "INSPECTION: closest to spec — paper-stack ribbons + gentle wave OK, but only 2 wisps (need 4-6), deckle edge weak, ink outline barely visible. See forge/atlas-3-review-rejects.md.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:25:00Z",
+      "reviewer": "gemini-2.5-flash",
+      "score": 6
+    },
+    {
+      "file": "c5-hill.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-4-hills-halos",
+      "note": "Inspection: baked dark vignette/shadow in BG breaks transparent compositing; otherwise palette+structure+wobble OK",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:19:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 7
+    },
+    {
+      "file": "c3-ground-halo.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-4-hills-halos",
+      "note": "REJECT: secondary cyan/blue color in upper corners (must be pure violet); glow too opaque, outer edge too defined; halo fills ring not pure rim",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:19:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 5
+    },
+    {
+      "file": "c4-ground-halo.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-4-hills-halos",
+      "note": "REJECT: opaque blue/cyan corner pixels (must be transparent BG); glow too neon-bright not soft 25% alpha; missing rim shape, looks like solid object not soft halo",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:19:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 3
+    },
+    {
+      "file": "c5-ground-halo.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-4-hills-halos",
+      "note": "REJECT: opaque pink center (must be transparent center -> outer fade); reads as solid glow not 'rim halo'; alpha falloff inverted",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:19:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 2
+    },
+    {
+      "file": "face-overlay-eyes.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-5-cosmetics",
+      "note": "APPROVE: large googly eyes with eyebrows, cream sclera + dark pupil + cream highlight, ink outline, transparent BG. Visual override of Gemini false-positive (rejected as 3D - actually 2D paper-cut).",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:30:00Z",
+      "reviewer": "claude-opus-4-7+visual-override",
+      "score": 8
+    },
+    {
+      "file": "face-overlay-smiley.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-5-cosmetics",
+      "note": "APPROVE: smiley mouth crescent with cream body + ink mouth-line + 2 pink blush dots. Matches Atlas-5 cell 2 spec exactly. Visual override of Gemini false-positive (Gemini wrongly expected 'eyes only').",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:30:00Z",
+      "reviewer": "claude-opus-4-7+visual-override",
+      "score": 8
+    },
+    {
+      "file": "accessory-princess.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-5-cosmetics",
+      "note": "APPROVE: gold tiara with cream highlight, 5 triangular tips, central pink gem + cyan + violet side gems. Ink outline, transparent BG, hand-drawn wobble. Visual override of Gemini false-positive on transparency.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:30:00Z",
+      "reviewer": "claude-opus-4-7+visual-override",
+      "score": 9
+    },
+    {
+      "file": "accessory-ninja.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-5-cosmetics",
+      "note": "APPROVE: red headband + dark band underlay, white front circle with kanji symbol, ink outline, transparent BG, hand-drawn wobble. Matches spec.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:30:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 10
+    },
+    {
+      "file": "accessory-wizard.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-5-cosmetics",
+      "note": "APPROVE: tall purple cone hat with bent tip, 3 cream stars, gold buckle band, ink outline, hand-drawn wobble. Palette internally consistent (purple/gold/cream).",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:30:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 10
+    },
+    {
+      "file": "accessory-detective.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-5-cosmetics",
+      "note": "APPROVE: deerstalker cap with checkered pattern, tan/khaki body, dark band, ear-flap shapes. NO violet/magenta leak (slicer cleanup verified). Bow on top is a nice extra detail.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:30:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 10
+    },
+    {
+      "file": "accessory-cowboy.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-5-cosmetics",
+      "note": "APPROVE: wide-brim cowboy hat, warm tan body, dark brown band, brim curves up at sides. Ink outline, hand-drawn wobble, transparent BG.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:30:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 10
+    },
+    {
+      "file": "accessory-smiley-hat.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-5-cosmetics",
+      "note": "APPROVE: yellow summer sun-hat with cream rim band, white flower with yellow center, rounded brim. Ink outline, transparent BG.",
+      "flaggedAt": "2026-04-30T23:59:44.734Z",
+      "reviewedAt": "2026-05-01T00:30:00Z",
+      "reviewer": "gemini-2.5-pro",
+      "score": 10
+    },
+    {
+      "file": "c1-hole-grass-v3.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-holes-v2",
+      "note": "INSPECTION: alternate v2 hole rim — kept as fallback. PRIMARY uses atlas-holes-v1 (taller grass blades + warmer dirt + chunky stone bottom band better matches paper-craft layered-cut style).",
+      "flaggedAt": "2026-05-01T08:50:00Z",
+      "reviewer": "claude-opus-4-7",
+      "score": 7
+    },
+    {
+      "file": "c2-hole-cloud-v2.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-holes-v2",
+      "note": "INSPECTION: alternate v2 (clusters of single fluffy clouds vs v1's thick foam ring). v1 chosen PRIMARY for stronger 3D depth + warmer dirt rim.",
+      "flaggedAt": "2026-05-01T08:50:00Z",
+      "reviewer": "claude-opus-4-7",
+      "score": 7
+    },
+    {
+      "file": "c3-hole-crystal-v2.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-holes-v2",
+      "note": "INSPECTION: alternate v2 — flatter geometric crystals (v1 has chunkier 3D facets). v1 chosen PRIMARY for richer depth.",
+      "flaggedAt": "2026-05-01T08:50:00Z",
+      "reviewer": "claude-opus-4-7",
+      "score": 7
+    },
+    {
+      "file": "c4-hole-neon-v2.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-holes-v2",
+      "note": "INSPECTION: alternate v2 (radial neon strips vs v1 outer ring of segments). v1 chosen PRIMARY for stronger arcade-tube paper-craft read at small sizes.",
+      "flaggedAt": "2026-05-01T08:50:00Z",
+      "reviewer": "claude-opus-4-7",
+      "score": 7
+    },
+    {
+      "file": "c5-hole-candy-v2.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-holes-v2",
+      "note": "INSPECTION: alternate v2 has fewer candy beads + warmer cream stripes. v1 chosen PRIMARY for vibrant 4-bead variety + cleaner stripe contrast.",
+      "flaggedAt": "2026-05-01T08:50:00Z",
+      "reviewer": "claude-opus-4-7",
+      "score": 7
+    },
+    {
+      "file": "mood-crown-anchor.png",
+      "sourceDir": "www/assets/sliced/batch16/atlas-holes-v2",
+      "note": "INSPECTION: standalone crown anchor decoration; not yet wired. Reserved for level-select / crown stamp UX.",
+      "flaggedAt": "2026-05-01T08:50:00Z",
+      "reviewer": "claude-opus-4-7",
+      "score": 7
+    }
+  ]
+}

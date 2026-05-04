@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Golf Paper Craft — Asset Browser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* === Golf Paper Craft palette ===
+     paper-cream #FBF5E0  page-cream #F5EDD8  warm-tan #E8D5A8
+     grass-light #C6E45C  grass #9DCB55  grass-dark #7AAA38
+     earth-light #B07A48  earth #8B5847  earth-dark #5A3C1E
+     sky #6FB8DC  ink #2B1D12  flag-orange #E8A040  pink #F7C8DD
+  */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #2B1D12;
+    background: #F5EDD8;
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(157, 203, 85, 0.10) 0%, transparent 28%),
+      radial-gradient(circle at 88% 82%, rgba(111, 184, 220, 0.10) 0%, transparent 30%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><circle cx='4' cy='6' r='0.6' fill='%23B07A48' opacity='0.18'/><circle cx='22' cy='14' r='0.5' fill='%238B5847' opacity='0.15'/><circle cx='34' cy='28' r='0.6' fill='%237AAA38' opacity='0.16'/><circle cx='12' cy='32' r='0.5' fill='%23B07A48' opacity='0.14'/></svg>");
+    min-height: 100vh;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: linear-gradient(180deg, #FBF5E0 0%, #F0E4C0 100%);
+    padding: 16px 24px;
+    border-bottom: 3px solid #5A3C1E;
+    box-shadow: 0 4px 0 rgba(43, 29, 18, 0.06);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  }
+  h1 {
+    margin: 0; font-size: 26px; font-weight: 800; color: #5A3C1E;
+    letter-spacing: -0.01em;
+    text-shadow: 1.5px 1.5px 0 rgba(255,255,255,0.7), 2px 2px 0 rgba(43,29,18,0.08);
+  }
+  h1::before { content: '⛳ '; font-size: 22px; }
+  .meta { color: #8B5847; font-size: 13px; font-weight: 500; }
+  .controls { flex: 1; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  input, select {
+    background: #FFF9E8; color: #2B1D12; font-family: inherit;
+    border: 2px solid #B07A48; padding: 8px 12px; border-radius: 10px;
+    font-size: 14px; font-weight: 500; transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, select:focus { outline: none; border-color: #5A3C1E; box-shadow: 0 0 0 3px rgba(232,160,64,0.25); }
+  input { min-width: 220px; }
+  .chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 12px 24px; background: #FBF5E0;
+    border-bottom: 2px dashed rgba(139,88,71,0.3);
+  }
+  .chip {
+    padding: 6px 14px; border-radius: 999px;
+    background: #FFF9E8; border: 1.5px solid #B07A48;
+    cursor: pointer; font-size: 12px; font-weight: 600; color: #5A3C1E;
+    user-select: none; transition: all .15s;
+  }
+  .chip:hover { border-color: #5A3C1E; transform: translateY(-1px); }
+  .chip.active {
+    background: linear-gradient(180deg, #C6E45C 0%, #9DCB55 100%);
+    color: #2B1D12; border-color: #5A3C1E;
+    box-shadow: 0 2px 0 #5A3C1E;
+  }
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 14px; padding: 18px 24px;
+  }
+  .card {
+    background: #FFF9E8;
+    border: 2px solid #5A3C1E;
+    border-radius: 12px;
+    overflow: hidden; cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+    display: flex; flex-direction: column;
+    box-shadow: 0 3px 0 rgba(43,29,18,0.18), 0 0 0 1px rgba(255,255,255,0.6) inset;
+  }
+  .card:hover {
+    transform: translateY(-3px) rotate(-0.4deg);
+    box-shadow: 0 6px 0 rgba(43,29,18,0.22), 0 0 0 1px rgba(255,255,255,0.6) inset;
+  }
+  .thumb {
+    aspect-ratio: 1;
+    background:
+      linear-gradient(135deg, #DDF0FF 0%, #B8E0F2 50%, #C6E45C 50%, #9DCB55 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 10px;
+    position: relative;
+    border-bottom: 2px solid #5A3C1E;
+  }
+  .thumb::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at 30% 25%, rgba(255,255,255,0.4) 0%, transparent 55%);
+  }
+  .thumb img { max-width: 100%; max-height: 100%; object-fit: contain; image-rendering: -webkit-optimize-contrast; position: relative; z-index: 1; }
+  .anim-frame {
+    width: 128px; height: 128px; background-repeat: no-repeat; background-size: auto 100%;
+    image-rendering: -webkit-optimize-contrast;
+  }
+  @keyframes sprite-play { to { background-position-x: var(--end); } }
+  .info { padding: 10px 12px; font-size: 12px; background: #FFF9E8; }
+  .info .n { color: #2B1D12; font-weight: 700; word-break: break-word; line-height: 1.25; }
+  .info .d { color: #8B5847; font-size: 10px; margin-top: 4px; display: flex; justify-content: space-between; font-weight: 500; }
+  .tag {
+    display: inline-block; font-size: 9px; padding: 2px 8px; border-radius: 999px;
+    background: #E8D5A8; color: #5A3C1E; margin-top: 4px; font-weight: 600;
+    border: 1px solid #B07A48;
+  }
+  .dl {
+    display: block; margin-top: 10px; text-align: center;
+    background: linear-gradient(180deg, #E8A040 0%, #D08020 100%);
+    color: #FFF9E8; text-decoration: none; padding: 7px;
+    border-radius: 8px; font-size: 11px; font-weight: 700;
+    border: 1.5px solid #5A3C1E; box-shadow: 0 2px 0 #5A3C1E;
+    transition: transform .1s;
+  }
+  .dl:hover { transform: translateY(-1px); }
+  .dl:active { transform: translateY(1px); box-shadow: 0 0 0 #5A3C1E; }
+  .modal .dl { margin-top: 12px; padding: 11px; font-size: 13px; }
+  /* modal */
+  .modal {
+    position: fixed; inset: 0; background: rgba(43, 29, 18, 0.6);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center; justify-content: center; z-index: 100; padding: 24px;
+  }
+  .modal.open { display: flex; }
+  .modal .box {
+    background: #FBF5E0;
+    border: 3px solid #5A3C1E; border-radius: 16px;
+    max-width: 90vw; max-height: 90vh; overflow: auto; padding: 22px;
+    display: grid; grid-template-columns: 1fr auto; gap: 22px;
+    box-shadow: 0 8px 0 rgba(43,29,18,0.25);
+  }
+  .modal .preview {
+    min-width: 400px; min-height: 400px; max-width: 60vw; max-height: 80vh;
+    background:
+      linear-gradient(135deg, #DDF0FF 0%, #B8E0F2 50%, #C6E45C 50%, #9DCB55 100%);
+    border-radius: 12px; border: 2px solid #5A3C1E;
+    display: flex; align-items: center; justify-content: center; padding: 22px;
+  }
+  .modal .preview img { max-width: 100%; max-height: 100%; }
+  .modal .details { min-width: 240px; font-size: 13px; }
+  .modal .details h2 { margin: 0 0 14px; color: #5A3C1E; font-size: 18px; font-weight: 800; word-break: break-word; }
+  .modal .details .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed rgba(139,88,71,0.3); }
+  .modal .details .row .k { color: #8B5847; font-weight: 600; }
+  .modal .close {
+    position: absolute; top: 16px; right: 24px; font-size: 32px;
+    color: #5A3C1E; cursor: pointer; background: none; border: none;
+    line-height: 1; font-weight: 800;
+  }
+  .empty { text-align: center; padding: 60px; color: #8B5847; font-size: 15px; font-weight: 500; }
+  /* confirm dialog */
+  #confirm-overlay {
+    position: fixed; inset: 0; background: rgba(43,29,18,0.55);
+    backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center; z-index: 999;
+  }
+  #confirm-overlay.open { display: flex; }
+  #confirm-box {
+    background: #FBF5E0; border: 3px solid #5A3C1E; border-radius: 16px;
+    padding: 28px 32px; max-width: 380px; width: 90vw; text-align: center;
+    box-shadow: 0 8px 0 rgba(43,29,18,0.25);
+  }
+  #confirm-box p { margin: 0 0 22px; font-size: 15px; color: #3A1E0A; font-weight: 600; line-height: 1.5; word-break: break-all; }
+  #confirm-box .row { display: flex; gap: 12px; justify-content: center; }
+  #confirm-box button { flex: 1; padding: 10px; border-radius: 10px; border: 2px solid #5A3C1E; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  #confirm-yes { background: #7a2020; color: #fff; }
+  #confirm-yes:hover { background: #9a2626; }
+  #confirm-no  { background: #FBF5E0; color: #5A3C1E; }
+  #confirm-no:hover { background: #ede5cc; }
+  .tab {
+    background: #FFF9E8; border: 1.5px solid #B07A48; color: #5A3C1E;
+    padding: 8px 16px; border-radius: 10px; cursor: pointer;
+    font-size: 13px; font-weight: 600; font-family: inherit;
+  }
+  .tab:hover { border-color: #5A3C1E; transform: translateY(-1px); }
+  .tab.active {
+    background: linear-gradient(180deg, #E8A040 0%, #D08020 100%);
+    color: #FFF9E8; border-color: #5A3C1E;
+    box-shadow: 0 2px 0 #5A3C1E;
+  }
+  .miss { background:#FFF9E8; border:2px solid #5A3C1E; border-radius:12px; padding:14px; box-shadow: 0 3px 0 rgba(43,29,18,0.18); }
+  .miss h3 { margin:0 0 8px; color:#2B1D12; font-size:14px; font-weight:700; }
+  .miss .meta { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .miss .notes { font-size:12px; color:#5A3C1E; line-height:1.5; margin-bottom:8px; }
+  .miss .prompt { font-size:11px; color:#5A3C1E; background:#F0E4C0; border:1px dashed #B07A48; border-radius:6px; padding:8px; max-height:80px; overflow:auto; font-family:ui-monospace,Menlo,monospace; white-space:pre-wrap; margin-bottom:8px; }
+  .miss .actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .miss .btn {
+    flex:1; min-width:100px; padding:8px 10px; border-radius:8px;
+    border:1.5px solid #5A3C1E; background:#FFF9E8; color:#2B1D12;
+    font-family: inherit; font-size:11px; font-weight:700; cursor:pointer;
+    text-align:center; transition: transform .1s;
+  }
+  .miss .btn:hover { transform: translateY(-1px); }
+  .miss .btn.primary { background: linear-gradient(180deg, #C6E45C 0%, #9DCB55 100%); color:#2B1D12; box-shadow: 0 2px 0 #5A3C1E; }
+  .miss .btn.danger { background: linear-gradient(180deg, #E87878 0%, #C04040 100%); color:#FFF9E8; border-color:#5A3C1E; box-shadow: 0 2px 0 #5A3C1E; }
+  .miss .preview { margin:8px 0; padding:10px; background: linear-gradient(135deg, #DDF0FF 0%, #C6E45C 100%); border:2px solid #5A3C1E; border-radius:8px; display:flex; align-items:center; gap:8px; }
+  .miss .preview img { max-height:64px; max-width:128px; }
+  .up-preview {
+    margin:10px 0; padding:14px;
+    background: linear-gradient(135deg, #DDF0FF 0%, #B8E0F2 50%, #C6E45C 50%, #9DCB55 100%);
+    border:2px solid #5A3C1E; border-radius:10px; text-align:center;
+  }
+  .up-preview img { max-width:100%; max-height:280px; object-fit:contain; cursor:zoom-in; }
+  .up-info { margin-top:8px; }
+  .up-name { font-size:12px; color:#2B1D12; word-break:break-all; font-weight:700; }
+  .up-meta { font-size:11px; color:#8B5847; margin-top:2px; font-weight:500; }
+  .toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:#FBF5E0; color:#2B1D12; padding:10px 20px;
+    border-radius:999px; border:2px solid #5A3C1E;
+    box-shadow: 0 4px 0 rgba(43,29,18,0.2);
+    z-index:200; font-size:13px; font-weight:600; opacity:0; transition:opacity .2s;
+  }
+  .toast.show { opacity:1; }
+  .pri-P0 { background:#C04040; color:#FFF9E8; }
+  .pri-P1 { background:#E8A040; color:#2B1D12; }
+  .pri-P2 { background:#E8D5A8; color:#5A3C1E; }
+  .st-todo { background:#E8D5A8; color:#5A3C1E; }
+  .st-in-progress { background:#6FB8DC; color:#FFF9E8; }
+  .st-waiting-for-review { background:#E8A040; color:#2B1D12; }
+  .st-denied { background:#C04040; color:#FFF9E8; }
+  .st-approved, .st-done { background:#9DCB55; color:#2B1D12; }
+  .st-blocked { background:#8B5847; color:#FFF9E8; }
+  .deny-reason { margin:8px 0; padding:10px; background:#FCE0E0; border-left:4px solid #C04040; color:#5A1818; font-size:12px; border-radius:6px; font-weight:500; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Golf Paper Craft — Asset Browser</h1>
+  <span class="meta" id="meta">loading…</span>
+  <div class="tabs" style="display:flex;gap:6px;flex-wrap:wrap;">
+    <button class="tab active" data-tab="have">Mevcut</button>
+    <button class="tab" data-tab="todo">Eksik</button>
+    <button class="tab" data-tab="waiting">Bekleyen</button>
+    <button class="tab" data-tab="approved">Onaylı</button>
+    <button class="tab" data-tab="denied">Reddedilen</button>
+    <button class="tab" data-tab="review" id="review-tab" style="display:none;">İnceleme</button>
+    <button class="tab" data-tab="trash" id="trash-tab" style="display:none;">Çöp</button>
+  </div>
+  <div class="controls">
+    <input id="q" placeholder="Ara (isim)…">
+    <select id="type">
+      <option value="">Tüm tipler</option>
+      <option value="Resim">Resim</option>
+      <option value="Animasyon">Animasyon</option>
+    </select>
+    <select id="cat">
+      <option value="">Tüm kategoriler</option>
+    </select>
+    <select id="ext">
+      <option value="">Tüm formatlar</option>
+    </select>
+  </div>
+</header>
+<div class="chips" id="chips"></div>
+<div class="grid" id="grid"></div>
+<div id="confirm-overlay" onclick="if(event.target===this)_confirmResolve(false)">
+  <div id="confirm-box">
+    <p id="confirm-msg"></p>
+    <div class="row">
+      <button id="confirm-yes" onclick="_confirmResolve(true)">Evet, Sil</button>
+      <button id="confirm-no"  onclick="_confirmResolve(false)">Vazgeç</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+  <button class="close" onclick="closeModal()">×</button>
+  <div class="box" id="box"></div>
+</div>
+<script>
+let data = { items: [] };
+let missing = { items: [] };
+let review = { items: [] };
+let config = null;
+let lastAction = null; // for undo
+
+function sourceDirFor(item) {
+  if (!config) return '';
+  // review tab items carry sourceDir directly
+  const flagDir = item._flag?.sourceDir || item.sourceDir;
+  if (flagDir) return flagDir;
+  const src = item.src || '';
+  const tag = src.split('/')[2];
+  const s = (config.sources || []).find(x => x.tag === tag);
+  return s ? s.dir : '';
+}
+let tab = 'have';
+let filter = { q: '', cat: '', ext: '', kind: '', type: '' };
+
+async function load() {
+  const [r, m, c, rv] = await Promise.all([
+    fetch('./manifest.json?' + Date.now()).then(x => x.json()),
+    fetch('/api/missing?' + Date.now()).then(x => x.ok ? x.json() : Promise.reject()).catch(() => fetch('./missing.json').then(x => x.json())).catch(() => ({ items: [] })),
+    fetch('./config.json').then(x => x.json()).catch(() => null),
+    fetch('/api/review-flag?' + Date.now()).then(x => x.ok ? x.json() : Promise.reject()).catch(() => fetch('./review.json').then(x => x.json())).catch(() => ({ items: [] })),
+  ]);
+  data = r; missing = m; config = c; review = rv;
+  updateTabVisibility();
+  // probe trash count (public endpoint)
+  fetch('/api/trash').then(x => x.json()).then(t => {
+    const count = (t.files || []).filter(f => !f.name.endsWith('.meta.json')).length;
+    document.getElementById('trash-tab').style.display = count ? '' : 'none';
+  }).catch(() => {});
+  updateMeta();
+  buildChips();
+  buildCatSelect();
+  render();
+}
+
+const STATUS_FOR_TAB = {
+  todo: s => s === 'todo' || s === 'in-progress',
+  waiting: s => s === 'waiting-for-review',
+  approved: s => s === 'approved',
+  denied: s => s === 'denied',
+};
+
+function itemsForTab() {
+  if (tab === 'have') return data.items;
+  if (tab === 'review') {
+    // Resolve flagged files to manifest items so we get full thumb/dim info
+    const map = new Map(data.items.map(i => [i.file, i]));
+    return review.items.map(r => {
+      const m = map.get(r.file);
+      return m ? { ...m, _flag: r } : { id: 'flag-' + r.file, file: r.file, name: r.file, src: '', dim: '?', size: 0, kind: '—', type: '—', _flag: r, _missing: true };
+    });
+  }
+  const fn = STATUS_FOR_TAB[tab];
+  return missing.items.filter(i => fn(i.status));
+}
+
+function updateTabVisibility() {
+  for (const k of ['waiting', 'approved', 'denied']) {
+    const count = missing.items.filter(i => STATUS_FOR_TAB[k](i.status)).length;
+    const btn = document.querySelector(`.tab[data-tab="${k}"]`);
+    if (btn) btn.style.display = count ? '' : 'none';
+  }
+  const reviewBtn = document.getElementById('review-tab');
+  if (reviewBtn) reviewBtn.style.display = (review.items.length || tab === 'review') ? '' : 'none';
+  // If current tab just got hidden, fall back to Mevcut
+  const activeBtn = document.querySelector('.tab.active');
+  if (activeBtn && activeBtn.style.display === 'none') {
+    document.querySelector('.tab[data-tab="have"]').click();
+  }
+}
+
+function updateMeta() {
+  const el = document.getElementById('meta');
+  if (tab === 'have') el.textContent = `${data.count} asset · updated ${new Date(data.generated).toLocaleString()}`;
+  else if (tab === 'review') el.textContent = `${review.items.length} inceleme bekliyor · updated ${review.updated || '—'}`;
+  else {
+    const count = itemsForTab().length;
+    const label = { todo: 'eksik', waiting: 'bekleyen', approved: 'onaylı', denied: 'reddedilen' }[tab];
+    el.textContent = `${count} ${label} · updated ${missing.updated || '—'}`;
+  }
+}
+
+function buildCatSelect() {
+  fillSelect('cat', [...new Set(data.items.map(i => i.category))].sort());
+  fillSelect('ext', [...new Set(data.items.map(i => i.ext))].sort().map(e => e.toUpperCase()));
+}
+function fillSelect(id, values) {
+  const sel = document.getElementById(id);
+  values.forEach(v => {
+    if ([...sel.options].some(o => o.value.toLowerCase() === String(v).toLowerCase())) return;
+    const o = document.createElement('option');
+    o.value = id === 'ext' ? String(v).toLowerCase() : v;
+    o.textContent = v;
+    sel.appendChild(o);
+  });
+}
+
+function buildChips() {
+  const kinds = [...new Set(data.items.map(i => i.kind))].sort();
+  const c = document.getElementById('chips');
+  c.innerHTML = '';
+  const all = chip('Tümü', ''); all.classList.add('active');
+  all.onclick = () => { filter.kind = ''; activateChip(all); render(); };
+  c.appendChild(all);
+  kinds.forEach(k => {
+    const ch = chip(`${k} (${data.items.filter(i => i.kind === k).length})`, k);
+    ch.onclick = () => { filter.kind = k; activateChip(ch); render(); };
+    c.appendChild(ch);
+  });
+}
+
+function chip(label, value) {
+  const e = document.createElement('div');
+  e.className = 'chip'; e.textContent = label; e.dataset.v = value;
+  return e;
+}
+
+function activateChip(el) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function render() {
+  const g = document.getElementById('grid');
+  const q = filter.q.toLowerCase();
+  if (tab !== 'have' && tab !== 'review') {
+    const src = itemsForTab();
+    const filtered = src.filter(i =>
+      (!q || i.name.toLowerCase().includes(q)) &&
+      (!filter.kind || i.kind === filter.kind) &&
+      (!filter.type || i.type === filter.type)
+    );
+    if (!filtered.length) { g.innerHTML = `<div class="empty">Liste boş.</div>`; return; }
+    g.innerHTML = filtered.map(i => {
+      const preview = i.uploadedFile
+        ? `<div class="up-preview"><img src="/api/uploaded?file=${encodeURIComponent(i.uploadedFile)}&t=${Date.now()}" onload="this.nextElementSibling.querySelector('.dim').textContent=this.naturalWidth+'x'+this.naturalHeight" onerror="this.style.display='none';this.parentElement.querySelector('.err').style.display='block'"><div class="up-info"><div class="up-name">${i.uploadedFile}</div><div class="up-meta"><span class="dim">—</span> · ham yüklenmiş (işlenmemiş)</div><div class="err" style="display:none;color:#c94d4d;font-size:11px;">Preview yüklenemedi</div></div></div>` : '';
+      const deny = i.status === 'denied' && i.denyReason ? `<div class="deny-reason"><b>Reddedildi:</b> ${escapeHtml(i.denyReason)}</div>` : '';
+      const actions = [];
+      const qn = JSON.stringify(i.name).replace(/"/g, '&quot;');
+      if (i.prompt && (i.status === 'todo' || i.status === 'in-progress' || i.status === 'denied')) actions.push(`<button class="btn primary" onclick="copyPrompt(${qn})">Prompt Kopyala</button>`);
+      if (i.status === 'todo' || i.status === 'in-progress' || i.status === 'denied') actions.push(`<button class="btn" onclick="uploadFor(${qn})">Upload</button>`);
+      if (i.status === 'waiting-for-review') {
+        actions.push(`<button class="btn primary" onclick="reviewAction(${qn},'approve')">Onayla</button>`);
+        actions.push(`<button class="btn danger" onclick="reviewAction(${qn},'deny')">Reddet</button>`);
+        actions.push(`<button class="btn" onclick="deleteUpload(${qn})">Sil</button>`);
+      }
+      if (i.status === 'approved') {
+        actions.push(`<button class="btn primary" onclick="jumpToAsset(${qn})">Assete Git</button>`);
+        actions.push(`<button class="btn" onclick="clearEntry(${qn})">Temizle</button>`);
+        actions.push(`<button class="btn danger" onclick="reviewAction(${qn},'deny')">Reddet</button>`);
+      }
+      if (i.status === 'denied') {
+        actions.push(`<button class="btn primary" onclick="reviewAction(${qn},'approve')">Onayla</button>`);
+        actions.push(`<button class="btn" onclick="reviewAction(${qn},'reopen')">İncelemeye Al</button>`);
+        actions.push(`<button class="btn danger" onclick="deleteUpload(${qn})">Sil</button>`);
+      }
+      if (i.uploadedFile) actions.push(`<a class="btn" href="/api/uploaded?file=${encodeURIComponent(i.uploadedFile)}" download="${i.uploadedFile}">İndir</a>`);
+      return `
+      <div class="miss" id="miss-${cssEsc(i.name)}">
+        <h3>${i.name}</h3>
+        <div class="meta">
+          <span class="tag pri-${i.priority}">${i.priority}</span>
+          <span class="tag st-${i.status}">${i.status}</span>
+          <span class="tag">${i.kind}</span>
+          <span class="tag" style="background:${i.type==='Animasyon'?'#8b4d1e':'#3a2d1d'}">${i.type}</span>
+        </div>
+        <div class="notes">${i.notes || ''}</div>
+        ${deny}
+        ${preview}
+        ${i.prompt && (i.status!=='approved') ? `<div class="prompt">${escapeHtml(i.prompt)}</div>` : ''}
+        <div class="actions">${actions.join('')}</div>
+      </div>`;
+    }).join('');
+    return;
+  }
+  const baseItems = (tab === 'review') ? itemsForTab() : data.items;
+  const filtered = baseItems.filter(i =>
+    (!q || i.name.toLowerCase().includes(q)) &&
+    (!filter.cat || i.category === filter.cat) &&
+    (!filter.ext || i.ext === filter.ext) &&
+    (!filter.kind || i.kind === filter.kind) &&
+    (!filter.type || i.type === filter.type)
+  );
+  if (!filtered.length) { g.innerHTML = '<div class="empty">Eşleşen asset yok.</div>'; return; }
+  g.innerHTML = filtered.map(i => {
+    let thumbInner = `<img loading="lazy" src="${i.src}" alt="${i.name}">`;
+    // Animation playback: if strip with N frames (dim like "WxH" where W = H*N)
+    if (i.type === 'Animasyon' && i.dim) {
+      const m = i.dim.match(/^(\d+)x(\d+)$/);
+      const nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
+      if (m) {
+        const w = +m[1], h = +m[2];
+        const frames = nameFrames ? +nameFrames : (w > h ? Math.round(w / h) : 1);
+        if (frames > 1) {
+          // Display: keep aspect ratio of a single frame; cap to 128px box.
+          const frameW = w / frames;
+          const dispH = 128, dispW = Math.min(128, Math.round(frameW * (dispH / h)));
+          const endX = -((frames - 1) * dispW);
+          const dur = (frames / 8).toFixed(2);
+          thumbInner = `<div class="anim-frame" style="width:${dispW}px;height:${dispH}px;background-image:url('${i.src}');background-size:${dispW * frames}px ${dispH}px;--end:${endX}px;animation:sprite-play ${dur}s steps(${frames - 1}) infinite;"></div>`;
+        }
+      }
+    }
+    const isFlagged = (review.items || []).some(r => r.file === i.file);
+    const flagTag = (tab === 'have' && isFlagged) ? ` <span class="tag" style="background:#c47a18;color:#1a1510;font-weight:600;" title="İnceleme listesinde">İncelemede</span>` : '';
+    return `
+    <div class="card">
+      <div class="thumb" onclick="openModal('${i.id}')">${thumbInner}</div>
+      <div class="info">
+        <div class="n">${i.name}</div>
+        <div class="d"><span>${i.dim || '—'}</span><span>${fmtSize(i.size)}</span></div>
+        <span class="tag">${i.kind}</span> <span class="tag" style="background:${i.type==='Animasyon'?'#8b4d1e':'#3a2d1d'}">${i.type}</span>${flagTag}
+        <a class="dl" href="${i.src}" download="${i.file}" onclick="event.stopPropagation()">İndir</a>
+        ${tab === 'review' ? `<button class="dl" style="background:#7a5a1f;border:none;cursor:pointer;" onclick="event.stopPropagation();editReviewNote(${JSON.stringify(i.file).replace(/"/g,'&quot;')})" title="Not düzenle">${escapeHtml(i._flag?.note || 'Not ekle')}</button><button class="dl" style="background:#3a5d2d;border:none;cursor:pointer;" onclick="event.stopPropagation();unflagReview(${JSON.stringify(i.file).replace(/"/g,'&quot;')})">Düzeldi</button>` : (isFlagged ? `<button class="dl" style="background:#3a5d2d;border:none;cursor:pointer;" onclick="event.stopPropagation();unflagReview(${JSON.stringify(i.file).replace(/"/g,'&quot;')})">İncelemeyi Kaldır</button>` : `<button class="dl" style="background:#7a5a1f;border:none;cursor:pointer;" onclick="event.stopPropagation();flagReview(${JSON.stringify(i.file).replace(/"/g,'&quot;')},${JSON.stringify(sourceDirFor(i)).replace(/"/g,'&quot;')})">İncele</button>`)}
+        <button class="dl" style="background:#4d1f1f;border:none;cursor:pointer;" onclick="event.stopPropagation();deleteAsset(${JSON.stringify(i.file).replace(/"/g,'&quot;')},${JSON.stringify(sourceDirFor(i)).replace(/"/g,'&quot;')}${tab === 'review' ? ',true' : ''})">Sil</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Ctrl+Shift+T → toggle admin mode (for purge capability)
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.shiftKey && e.key === 'T') {
+    e.preventDefault();
+    const t = prompt('Admin token (boş bırakırsan çıkış):');
+    if (t) { localStorage.setItem('adminToken', t); document.getElementById('trash-tab').style.display = ''; toast('Admin mod aktif'); }
+    else { localStorage.removeItem('adminToken'); document.getElementById('trash-tab').style.display = 'none'; toast('Admin mod kapalı'); }
+  }
+});
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  tab = t.dataset.tab;
+  if (tab === 'trash') { loadTrash(); return; }
+  const isHaveLike = tab === 'have' || tab === 'review';
+  document.querySelectorAll('.controls select').forEach(el => {
+    el.style.display = (!isHaveLike && el.id !== 'type') ? 'none' : '';
+  });
+  document.getElementById('chips').style.display = isHaveLike ? '' : 'none';
+  updateMeta();
+  render();
+});
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
+function cssEsc(s) { return String(s).replace(/[^a-z0-9_-]/gi, '_'); }
+
+function toast(msg, kind = 'ok') {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.borderColor = kind === 'err' ? '#c94d4d' : '#d4a849';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2500);
+}
+
+async function copyPrompt(name) {
+  const i = missing.items.find(x => x.name === name);
+  if (!i?.prompt) return toast('Prompt yok', 'err');
+  await navigator.clipboard.writeText(i.prompt);
+  toast('Prompt kopyalandı');
+}
+
+function uploadFor(name) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/png,image/webp,image/gif,image/jpeg';
+  inp.onchange = async () => {
+    const file = inp.files[0]; if (!file) return;
+    if (file.size > 20 * 1024 * 1024) return toast('20MB üstü kabul edilmiyor', 'err');
+    toast('Yükleniyor…');
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataBase64 = String(reader.result).split(',')[1];
+      try {
+        const r = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, filename: file.name, dataBase64 }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'upload failed');
+        toast('Yüklendi — waiting-for-review');
+        setTimeout(load, 800);
+      } catch (e) { toast(String(e.message), 'err'); }
+    };
+    reader.readAsDataURL(file);
+  };
+  inp.click();
+}
+
+async function reviewAction(name, action) {
+  let reason;
+  if (action === 'deny') {
+    reason = prompt(`${name} — neden reddediyorsun?`);
+    if (!reason) return;
+  } else if (action === 'approve' && !confirm(`${name} — onaylansın mı?`)) return;
+  else if (action === 'reopen' && !confirm(`${name} — incelemeye geri alınsın mı?`)) return;
+  const prev = missing.items.find(i => i.name === name);
+  const prevStatus = prev?.status, prevDenyReason = prev?.denyReason;
+  try {
+    const r = await fetch('/api/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, action, reason }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'review failed');
+    recordAction({ type: 'review', name, prevStatus, prevDenyReason, label: action === 'approve' ? 'onay' : action === 'deny' ? 'red' : 'incele' });
+    toast({ approve: 'Onaylandı', deny: 'Reddedildi', reopen: 'İncelemeye alındı' }[action]);
+    setTimeout(load, 800);
+  } catch (e) { toast(String(e.message), 'err'); }
+}
+
+function tryAnimate(img, name) {
+  const item = missing.items.find(x => x.name === name);
+  if (!item || item.type !== 'Animasyon') { img.nextElementSibling?.classList.add('hidden'); return; }
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const dim = img.parentElement.querySelector('.dim');
+  if (dim) dim.textContent = w + 'x' + h;
+  // parse frame count from name
+  const nm = (name.match(/_(\d+)f/i) || [])[1];
+  let fr = nm ? +nm : 0, cols = 0, rows = 0;
+  // detect layout: horizontal strip OR grid
+  if (fr && w % (w/fr) === 0 && h === w/fr) { cols = fr; rows = 1; }
+  else if (fr && w === h * fr) { cols = fr; rows = 1; }
+  else if (fr === 6 && w === 1536 && h === 1024) { cols = 3; rows = 2; } // 2x3 grid
+  else if (fr === 8 && w === 2048 && h === 1024) { cols = 4; rows = 2; }
+  if (!cols || !rows) { img.nextElementSibling?.classList.add('hidden'); return; }
+  const fw = w / cols, fh = h / rows;
+  const holder = img.nextElementSibling;
+  if (!holder) return;
+  const display = 200;
+  const scale = Math.min(display / fw, display / fh);
+  const dw = Math.round(fw * scale), dh = Math.round(fh * scale);
+  holder.style.cssText = `width:${dw}px;height:${dh}px;background-image:url('${img.src}');background-size:${Math.round(w*scale)}px ${Math.round(h*scale)}px;background-repeat:no-repeat;margin:8px auto 0;image-rendering:-webkit-optimize-contrast;`;
+  img.style.display = 'none';
+  let i = 0;
+  clearInterval(holder._anim);
+  holder._anim = setInterval(() => {
+    const col = i % cols, row = Math.floor(i / cols);
+    holder.style.backgroundPosition = `-${col*dw}px -${row*dh}px`;
+    i = (i + 1) % (cols * rows);
+  }, 125);
+}
+
+async function flagReview(file, dir) {
+  try {
+    const r = await fetch('/api/review-flag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, sourceDir: dir, note: '' }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'flag failed');
+    toast('İncelemeye eklendi');
+    setTimeout(load, 800);
+  } catch (e) { toast(String(e.message), 'err'); }
+}
+
+async function editReviewNote(file) {
+  const cur = (review.items.find(i => i.file === file) || {}).note || '';
+  const note = prompt(`${file} — not (boş bırakılabilir)`, cur);
+  if (note === null) return;
+  try {
+    const r = await fetch('/api/review-flag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, note }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'note failed');
+    toast('Not güncellendi');
+    setTimeout(load, 600);
+  } catch (e) { toast(String(e.message), 'err'); }
+}
+
+async function unflagReview(file) {
+  try {
+    const r = await fetch('/api/review-flag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, remove: true }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'unflag failed');
+    toast('İnceleme listesinden çıkarıldı');
+    setTimeout(load, 800);
+  } catch (e) { toast(String(e.message), 'err'); }
+}
+
+let _confirmResolve = () => {};
+function customConfirm(msg) {
+  return new Promise(res => {
+    _confirmResolve = (v) => {
+      document.getElementById('confirm-overlay').classList.remove('open');
+      res(v);
+    };
+    document.getElementById('confirm-msg').textContent = msg;
+    document.getElementById('confirm-overlay').classList.add('open');
+  });
+}
+
+async function deleteAsset(file, dir, andUnflag) {
+  if (!dir) return toast('Bu asset silinemez (dir yok)', 'err');
+  if (!await customConfirm(`${file} silinsin mi?\n(çöp kutusuna taşınır)`)) return;
+  try {
+    const r = await fetch('/api/asset-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, dir }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'delete failed');
+    recordAction({ type: 'asset-delete', file, label: 'silme' });
+    if (andUnflag) {
+      await fetch('/api/review-flag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file, remove: true }),
+      }).catch(() => {});
+    }
+    toast('Silindi (çöp kutusunda)');
+    setTimeout(load, 800);
+  } catch (e) { toast(String(e.message), 'err'); }
+}
+
+function recordAction(action) {
+  lastAction = { ...action, at: Date.now() };
+  updateUndoButton();
+}
+
+function updateUndoButton() {
+  let el = document.getElementById('undo-btn');
+  if (!el) {
+    el = document.createElement('button');
+    el.id = 'undo-btn';
+    el.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#d4a849;color:#1a1510;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-weight:600;z-index:200;transition:opacity .2s;box-shadow:0 2px 8px rgba(0,0,0,.4);';
+    el.onclick = undoLastAction;
+    document.body.appendChild(el);
+  }
+  const valid = lastAction && (Date.now() - lastAction.at) < 15000;
+  if (valid) {
+    el.textContent = `⟲ Geri Al (${lastAction.label})`;
+    el.style.opacity = '1';
+    el.style.cursor = 'pointer';
+    el.disabled = false;
+  } else {
+    el.textContent = '⟲ Geri Al';
+    el.style.opacity = '0.4';
+    el.style.cursor = 'not-allowed';
+    el.disabled = true;
+  }
+}
+
+setInterval(updateUndoButton, 1000);
+
+async function undoLastAction() {
+  if (!lastAction || (Date.now() - lastAction.at) > 15000) return;
+  const a = lastAction;
+  const token = localStorage.getItem('adminToken') || '';
+  try {
+    if (a.type === 'asset-delete' || a.type === 'upload-delete') {
+      const r = await fetch('/api/trash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore', file: a.file }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error);
+      // For upload-delete: also restore missing.json status + uploadedFile
+      if (a.type === 'upload-delete' && a.itemName) {
+        await fetch('/api/missing-patch', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: a.itemName, patch: { status: a.prevStatus || 'waiting-for-review', uploadedFile: a.file, denyReason: a.prevDenyReason || null } }),
+        });
+      }
+    } else if (a.type === 'review') {
+      // Revert to prev status
+      const prev = a.prevStatus;
+      let action;
+      if (prev === 'waiting-for-review') action = 'reopen';
+      else if (prev === 'approved') action = 'approve';
+      else if (prev === 'denied') action = 'deny';
+      else throw new Error('prev status revert not supported: ' + prev);
+      const body = { name: a.name, action };
+      if (action === 'deny') body.reason = a.prevDenyReason || 'restored by undo';
+      const r = await fetch('/api/review', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error);
+    } else if (a.type === 'clear') {
+      throw new Error('Clear geri alınamaz — missing listesinden kalıcı silindi');
+    } else {
+      throw new Error('bilinmeyen action: ' + a.type);
+    }
+    toast('Geri alındı');
+    lastAction = null;
+    updateUndoButton();
+    setTimeout(load, 800);
+  } catch (e) { toast('Undo: ' + e.message, 'err'); }
+}
+
+async function loadTrash() {
+  const token = localStorage.getItem('adminToken') || '';
+  const isAdmin = !!token;
+  try {
+    const r = await fetch('/api/trash' + (token ? '?admin=' + encodeURIComponent(token) : ''), {
+      headers: token ? { 'X-Admin-Token': token } : {},
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    const g = document.getElementById('grid');
+    const visibleFiles = j.files.filter(f => !f.name.endsWith('.meta.json'));
+    if (!visibleFiles.length) { g.innerHTML = '<div class="empty">Çöp boş.</div>'; return; }
+    g.innerHTML = visibleFiles.map(f => `
+      <div class="miss">
+        <h3>${f.name}</h3>
+        <div class="notes">${fmtSize(f.size)}</div>
+        <div class="actions">
+          <button class="btn primary" onclick="restoreTrash(${JSON.stringify(f.name).replace(/"/g,'&quot;')})">Geri Yükle</button>
+          ${isAdmin ? `<button class="btn danger" onclick="purgeTrash(${JSON.stringify(f.name).replace(/"/g,'&quot;')})">Kalıcı Sil</button>` : ''}
+        </div>
+      </div>`).join('');
+  } catch (e) { toast('Trash: ' + e.message, 'err'); }
+}
+
+async function restoreTrash(file) {
+  try {
+    const r = await fetch('/api/trash', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'restore', file }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    toast('Geri yüklendi');
+    setTimeout(loadTrash, 500);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function purgeTrash(file) {
+  if (!confirm(`${file} kalıcı silinsin mi? (geri alınamaz)`)) return;
+  const token = localStorage.getItem('adminToken') || '';
+  try {
+    const r = await fetch('/api/trash?admin=' + encodeURIComponent(token), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ action: 'purge', file }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    toast('Kalıcı silindi');
+    setTimeout(loadTrash, 500);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function jumpToAsset(name) {
+  document.querySelector('.tab[data-tab="have"]').click();
+  document.getElementById('q').value = name;
+  filter.q = name.toLowerCase();
+  render();
+}
+
+async function clearEntry(name) {
+  if (!confirm(`${name} — missing listesinden silinsin mi? (Asset dosyası Mevcut'ta kalır)`)) return;
+  try {
+    const r = await fetch('/api/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'clear failed');
+    toast('Temizlendi');
+    setTimeout(load, 800);
+  } catch (e) { toast(String(e.message), 'err'); }
+}
+
+async function deleteUpload(name) {
+  if (!confirm(`${name} upload'unu silmek istediğine emin misin?`)) return;
+  try {
+    const r = await fetch('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'delete failed');
+    const prev = missing.items.find(i => i.name === name);
+    if (prev?.uploadedFile) recordAction({ type: 'upload-delete', file: prev.uploadedFile, itemName: prev.name, prevStatus: prev.status, prevDenyReason: prev.denyReason, label: 'silme' });
+    toast('Silindi');
+    setTimeout(load, 800);
+  } catch (e) { toast(String(e.message), 'err'); }
+}
+
+function fmtSize(b) {
+  if (b < 1024) return b + 'B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + 'KB';
+  return (b / 1024 / 1024).toFixed(2) + 'MB';
+}
+
+function openModal(id) {
+  const i = data.items.find(x => x.id === id);
+  if (!i) return;
+  let previewInner = `<img src="${i.src}">`;
+  if (i.type === 'Animasyon' && i.dim) {
+    const m = i.dim.match(/^(\d+)x(\d+)$/);
+    const nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
+    if (m) {
+      const w = +m[1], h = +m[2];
+      const frames = nameFrames ? +nameFrames : (w > h ? Math.round(w / h) : 1);
+      if (frames > 1) {
+        const frameW = w / frames;
+        const dispH = 256, dispW = Math.round(frameW * (dispH / h));
+        const endX = -((frames - 1) * dispW), dur = (frames / 8).toFixed(2);
+        previewInner = `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+            <div style="font-size:11px;color:#5A3C1E;font-weight:600;">Oyun içi görünüm (${frames} frame @ 8 FPS)</div>
+            <div style="width:${dispW}px;height:${dispH}px;background-image:url('${i.src}');background-repeat:no-repeat;background-size:${dispW * frames}px ${dispH}px;animation:sprite-play ${dur}s steps(${frames-1}) infinite;--end:${endX}px;image-rendering:-webkit-optimize-contrast;"></div>
+            <div style="font-size:11px;color:#8b6b3d;">Ham strip:</div>
+            <img src="${i.src}" style="max-width:100%;">
+          </div>`;
+      }
+    }
+  }
+  document.getElementById('box').innerHTML = `
+    <div class="preview">${previewInner}</div>
+    <div class="details">
+      <h2>${i.name}</h2>
+      <div class="row"><span class="k">Kategori</span><span>${i.category}</span></div>
+      <div class="row"><span class="k">Tip</span><span>${i.type}</span></div>
+      <div class="row"><span class="k">Tür</span><span>${i.kind}</span></div>
+      <div class="row"><span class="k">Format</span><span>${i.ext.toUpperCase()}</span></div>
+      <div class="row"><span class="k">Boyut</span><span>${i.dim || '—'}</span></div>
+      <div class="row"><span class="k">Dosya</span><span>${fmtSize(i.size)}</span></div>
+      <div class="row"><span class="k">Dosya adı</span><span style="word-break:break-all;">${i.file}</span></div>
+      <div class="row"><span class="k">Güncellenme</span><span>${new Date(i.mtime).toLocaleDateString()}</span></div>
+      <a class="dl" href="${i.src}" download="${i.file}">İndir (${i.ext.toUpperCase()})</a>
+    </div>`;
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+document.getElementById('q').oninput = e => { filter.q = e.target.value; render(); };
+document.getElementById('cat').onchange = e => { filter.cat = e.target.value; render(); };
+document.getElementById('ext').onchange = e => { filter.ext = e.target.value; render(); };
+document.getElementById('type').onchange = e => { filter.type = e.target.value; render(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+{
+  "updated": "2026-04-26",
+  "items": [
+    {
+      "id": "c2-regen-island-tiles",
+      "name": "C2 — Sky Island Tiles (regenerate set)",
+      "category": "C2 Sky Kingdom — Regenerate",
+      "priority": "P1",
+      "status": "approved",
+      "notes": "Mevcut sky-island-center-tile / edge-left / edge-right görselleri raw-tile gibi, paper-craft stiline uymuyor (UI grid artifacts var). Yeni style guide ile 3'ü tek board olarak yeniden üret.",
+      "prompt": "See ASSET_PROMPTS.md → PART C / C1. Generate one wide reference board with three sky island tiles (left edge, center, right edge) on transparent BG. Match paper-craft style of attached source boards exactly."
+    },
+    {
+      "id": "c2-regen-portals",
+      "name": "C2 — Portal Rings blue+gold (regenerate)",
+      "category": "C2 Sky Kingdom — Regenerate",
+      "priority": "P2",
+      "status": "todo",
+      "notes": "sky-portal-ring-blue / -gold çok düz vector görünüyor, paper-craft değil. İkisini tek dosyada paper-craft stilinde yeniden iste.",
+      "prompt": "See ASSET_PROMPTS.md → PART C / C2."
+    },
+    {
+      "id": "c2-regen-fan-propeller",
+      "name": "C2 — Fan Propeller (regenerate)",
+      "category": "C2 Sky Kingdom — Regenerate",
+      "priority": "P2",
+      "status": "approved",
+      "notes": "sky-fan-propeller flat vector, paper-craft değil.",
+      "prompt": "See ASSET_PROMPTS.md → PART C / C3."
+    },
+    {
+      "id": "c2-regen-storm-cloud",
+      "name": "C2 — Storm Cloud (regenerate)",
+      "category": "C2 Sky Kingdom — Regenerate",
+      "priority": "P2",
+      "status": "approved",
+      "notes": "Mevcut storm cloud okay ama paper-craft stilinde değil.",
+      "prompt": "See ASSET_PROMPTS.md → PART C / C4."
+    },
+    {
+      "id": "c2-regen-void-mist",
+      "name": "C2 — Void Mist (regenerate)",
+      "category": "C2 Sky Kingdom — Regenerate",
+      "priority": "P2",
+      "status": "approved",
+      "notes": "void-mist çok soluk, görünmüyor. Daha karakteristik paper-craft sis bandı lazım.",
+      "prompt": "See ASSET_PROMPTS.md → PART C / C5."
+    },
+    {
+      "id": "c2-regen-wind-river",
+      "name": "C2 — Wind River Ribbon (regenerate)",
+      "category": "C2 Sky Kingdom — Regenerate",
+      "priority": "P2",
+      "status": "todo",
+      "notes": "wind-river-ribbon çok soluk pembe çizgiler, paper-craft değil. Tutarlı bir paper-band stilinde olmalı.",
+      "prompt": "See ASSET_PROMPTS.md → PART C / C6."
+    },
+    {
+      "id": "c3-crystal-cluster",
+      "name": "Crystal Cluster (C3)",
+      "category": "Course 3 — Crystal Caverns",
+      "priority": "P1",
+      "status": "approved",
+      "notes": "C3 caves için ışıldayan kristal kümesi — purple/cyan/yellow varyantlar. Cave duvarına yapışık, bouncy obstacle.",
+      "prompt": "Paper-craft style glowing crystal cluster, faceted purple gem with cyan rim glow, mounted on dark cave wall, hand-cut paper layers, soft shadow, transparent BG, 512x512 PNG."
+    },
+    {
+      "id": "c3-stalactite",
+      "name": "Stalactite (C3)",
+      "category": "Course 3 — Crystal Caverns",
+      "priority": "P0",
+      "status": "approved",
+      "notes": "Tavandan sarkan sivri taş. Top değdiğinde yukarıdan düşen tehlike.",
+      "prompt": "Paper-craft hanging stalactite, layered grey/charcoal stone, dripping tip, subtle moisture highlight, transparent BG, 256x512 PNG."
+    },
+    {
+      "id": "c3-glow-shard",
+      "name": "Glow Shard (collectible)",
+      "category": "Course 3 — Crystal Caverns",
+      "priority": "P2",
+      "status": "approved",
+      "notes": "Cave bonus collectible.",
+      "prompt": "Paper-craft floating crystal shard, vibrant cyan-pink gradient, soft outer glow, transparent BG, 256x256 PNG."
+    },
+    {
+      "id": "c4-lava-pool-loop-8f",
+      "name": "Lava Pool (C4) — 8f loop",
+      "category": "Course 4 — Lava Forge",
+      "priority": "P0",
+      "status": "approved",
+      "notes": "Bubbling lava — top değerse reset. 8-frame loop animation.",
+      "prompt": "Paper-craft bubbling lava pool, glowing orange-red surface with darker crust patches, 8-frame loop, transparent BG, 2048x256 PNG.",
+      "approvedFile": "animations/lava-pool-loop-8f.png"
+    },
+    {
+      "id": "c4-ember-particle-6f",
+      "name": "Ember Particle (C4) — 6f",
+      "category": "Course 4 — Lava Forge",
+      "priority": "P1",
+      "status": "approved",
+      "notes": "Lava'dan yükselen ışıltı parçacığı.",
+      "prompt": "Paper-craft tiny glowing ember rising and fading, 6-frame strip, warm orange, transparent BG, 768x128 PNG.",
+      "approvedFile": "animations/ember-particle-6f.png"
+    },
+    {
+      "id": "c4-anvil",
+      "name": "Anvil (C4 obstacle)",
+      "category": "Course 4 — Lava Forge",
+      "priority": "P1",
+      "status": "approved",
+      "notes": "Forge'da statik engel.",
+      "prompt": "Paper-craft forge anvil, dark iron grey with lighter top edge, ink outline, transparent BG, 512x384 PNG.",
+      "approvedFile": "sliced/batch3/c4-anvil.png"
+    },
+    {
+      "id": "c5-candy-cane",
+      "name": "Candy Cane Pole (C5)",
+      "category": "Course 5 — Candy Land",
+      "priority": "P0",
+      "status": "approved",
+      "notes": "Candy land'da spring-bouncer veya engel.",
+      "prompt": "Paper-craft red-and-white striped candy cane upright, slight curve at top, glossy paper texture, transparent BG, 256x768 PNG.",
+      "approvedFile": "sliced/batch3/c5-candy-cane.png"
+    },
+    {
+      "id": "c5-gummy-block",
+      "name": "Gummy Block (C5)",
+      "category": "Course 5 — Candy Land",
+      "priority": "P1",
+      "status": "approved",
+      "notes": "Bouncy gummy — candyBouncer için.",
+      "prompt": "Paper-craft jelly gummy cube, vibrant red/orange/green variants, slight squish, glossy highlight, transparent BG, 384x384 PNG.",
+      "approvedFile": "sliced/batch3/c5-gummy-red.png"
+    },
+    {
+      "id": "c5-syrup-splash-8f",
+      "name": "Syrup Splash (C5) — 8f",
+      "category": "Course 5 — Candy Land",
+      "priority": "P2",
+      "status": "approved",
+      "notes": "syrupRiver yüzey efekti loop.",
+      "prompt": "Paper-craft thick chocolate-syrup ripple loop, 8 frame strip, brown gradient with glossy highlight, transparent BG, 2048x256 PNG.",
+      "approvedFile": "animations/syrup-splash-loop-8f.png"
+    },
+    {
+      "id": "ui-settings-gear",
+      "name": "Settings Gear Icon",
+      "category": "UI",
+      "priority": "P2",
+      "status": "approved",
+      "notes": "In-game settings menüsü ikonu.",
+      "prompt": "Paper-craft settings gear, warm tan paper with brown ink outline, 8-tooth wheel with center bolt, transparent BG, 256x256 PNG.",
+      "approvedFile": "sliced/batch3/ui-settings-gear.png"
+    },
+    {
+      "id": "ui-pause-frame",
+      "name": "Pause Menu Frame",
+      "category": "UI",
+      "priority": "P2",
+      "status": "approved",
+      "notes": "Pause panel için 9-slice torn-paper frame.",
+      "prompt": "Paper-craft 9-slice torn paper frame, cream center with brown deckle edges, drop shadow, transparent BG, 512x512 PNG.",
+      "approvedFile": "sliced/batch3/ui-pause-frame.png"
+    },
+    {
+      "id": "fx-confetti-burst-8f",
+      "name": "Victory Confetti Burst — 8f",
+      "category": "FX",
+      "priority": "P1",
+      "status": "approved",
+      "notes": "Hole completion celebration.",
+      "prompt": "Paper-craft confetti burst with mixed colors (red/yellow/cyan/pink), 8-frame strip, transparent BG, 2048x256 PNG.",
+      "approvedFile": "animations/confetti-burst-8f.png"
+    },
+    {
+      "id": "fx-hole-stars-6f",
+      "name": "Hole-in-One Stars — 6f",
+      "category": "FX",
+      "priority": "P1",
+      "status": "approved",
+      "notes": "Birdie+ celebration rotation.",
+      "prompt": "Paper-craft three rotating stars, bright yellow with sparkle, 6-frame loop, transparent BG, 1536x256 PNG."
+    },
+    {
+      "id": "fx-ball-trail-4f",
+      "name": "Ball Trail Particle — 4f",
+      "category": "FX",
+      "priority": "P2",
+      "status": "approved",
+      "notes": "Top hareket halinde arkada bıraktığı puff.",
+      "prompt": "Paper-craft small white smoke puff, 4-frame fade, transparent BG, 512x128 PNG."
+    },
+    {
+      "id": "ui-tutorial-arrow-4f",
+      "name": "Tutorial Arrow — 4f",
+      "category": "UI — Tutorial",
+      "priority": "P2",
+      "status": "approved",
+      "notes": "C1 L1'de aim yönünü göstermek için.",
+      "prompt": "Paper-craft pointing arrow, warm orange with brown outline, 4-frame bounce, transparent BG, 512x128 PNG."
+    }
+  ]
+}

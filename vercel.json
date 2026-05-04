@@ -1,0 +1,5 @@
+{
+  "buildCommand": "echo 'using prebuilt public/'",
+  "outputDirectory": "public",
+  "framework": null
+}

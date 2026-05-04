@@ -1,0 +1,14 @@
+{
+  "name": "asset-browser",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Reusable asset browser with manifest, prompts, upload/review workflow — deploys to Vercel.",
+  "scripts": {
+    "build-manifest": "node scripts/build-manifest.mjs",
+    "prebuild": "npm run build-manifest",
+    "build": "node scripts/copy-assets.mjs",
+    "dev": "npm run build && npx serve public -l 5174",
+    "start": "npm run build"
+  }
+}
