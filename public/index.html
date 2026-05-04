@@ -322,6 +322,16 @@ async function load() {
   buildChips();
   buildCatSelect();
   render();
+  // Deep-link: ?edit=<id> opens that asset's editor modal on load.
+  try {
+    const params = new URLSearchParams(location.search);
+    const editId = params.get('edit');
+    if (editId) {
+      const found = (data.items || []).find(x => x.id === editId || x.canonicalId === editId || x.file === editId);
+      if (found) openEditor(found.src, found.file);
+      else console.warn('[asset-browser] ?edit=' + editId + ' not found in manifest');
+    }
+  } catch (e) { console.warn('[asset-browser] edit deep-link failed:', e && e.message); }
 }
 
 const STATUS_FOR_TAB = {
