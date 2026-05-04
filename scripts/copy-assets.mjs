@@ -43,4 +43,13 @@ if (fs.existsSync(uploadsDir)) {
 // config.json for client to know github repo
 fs.copyFileSync(path.resolve(ROOT, 'config.json'), path.resolve(ROOT, 'public/config.json'));
 
+// copy image-editor files
+const editorSrcDir = path.resolve(ROOT, '../www/lib/image-editor/src');
+if (fs.existsSync(editorSrcDir)) {
+  const libDst = path.resolve(ROOT, 'public/lib');
+  fs.mkdirSync(libDst, { recursive: true });
+  fs.copyFileSync(path.join(editorSrcDir, 'image-editor.js'), path.join(libDst, 'image-editor.js'));
+  fs.copyFileSync(path.join(editorSrcDir, 'image-editor.css'), path.join(libDst, 'image-editor.css'));
+}
+
 console.log(`Copied ${manifest.count} assets to ${OUT}`);
