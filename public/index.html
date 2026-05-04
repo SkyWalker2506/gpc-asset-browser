@@ -604,38 +604,6 @@ async function reviewAction(name, action) {
   } catch (e) { toast(String(e.message), 'err'); }
 }
 
-function tryAnimate(img, name) {
-  const item = missing.items.find(x => x.name === name);
-  if (!item || item.type !== 'Animasyon') { img.nextElementSibling?.classList.add('hidden'); return; }
-  const w = img.naturalWidth, h = img.naturalHeight;
-  const dim = img.parentElement.querySelector('.dim');
-  if (dim) dim.textContent = w + 'x' + h;
-  // parse frame count from name
-  const nm = (name.match(/_(\d+)f/i) || [])[1];
-  let fr = nm ? +nm : 0, cols = 0, rows = 0;
-  // detect layout: horizontal strip OR grid
-  if (fr && w % (w/fr) === 0 && h === w/fr) { cols = fr; rows = 1; }
-  else if (fr && w === h * fr) { cols = fr; rows = 1; }
-  else if (fr === 6 && w === 1536 && h === 1024) { cols = 3; rows = 2; } // 2x3 grid
-  else if (fr === 8 && w === 2048 && h === 1024) { cols = 4; rows = 2; }
-  if (!cols || !rows) { img.nextElementSibling?.classList.add('hidden'); return; }
-  const fw = w / cols, fh = h / rows;
-  const holder = img.nextElementSibling;
-  if (!holder) return;
-  const display = 200;
-  const scale = Math.min(display / fw, display / fh);
-  const dw = Math.round(fw * scale), dh = Math.round(fh * scale);
-  holder.style.cssText = `width:${dw}px;height:${dh}px;background-image:url('${img.src}');background-size:${Math.round(w*scale)}px ${Math.round(h*scale)}px;background-repeat:no-repeat;margin:8px auto 0;image-rendering:-webkit-optimize-contrast;`;
-  img.style.display = 'none';
-  let i = 0;
-  clearInterval(holder._anim);
-  holder._anim = setInterval(() => {
-    const col = i % cols, row = Math.floor(i / cols);
-    holder.style.backgroundPosition = `-${col*dw}px -${row*dh}px`;
-    i = (i + 1) % (cols * rows);
-  }, 125);
-}
-
 async function flagReview(file, dir) {
   try {
     const r = await fetch('/api/review-flag', {
