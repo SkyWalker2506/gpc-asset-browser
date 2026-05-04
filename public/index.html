@@ -249,8 +249,8 @@
   .st-blocked { background:#8B5847; color:#FFF9E8; }
   .deny-reason { margin:8px 0; padding:10px; background:#FCE0E0; border-left:4px solid #C04040; color:#5A1818; font-size:12px; border-radius:6px; font-weight:500; }
 </style>
-<link rel="stylesheet" href="lib/image-editor.css?v=3">
-<script src="lib/image-editor.js?v=3"></script>
+<link rel="stylesheet" href="lib/image-editor.css?v=4">
+<script src="lib/image-editor.js?v=4"></script>
 </head>
 <body>
 <header>
@@ -266,6 +266,8 @@
     <button class="tab" data-tab="trash" id="trash-tab" style="display:none;">Çöp</button>
   </div>
   <div class="controls">
+    <button class="tab" id="upload-video-btn" title="Video → Animation Strip" style="background:linear-gradient(180deg,#E8A040 0%,#D08020 100%);color:#FFF9E8;border-color:#5A3C1E;box-shadow:0 2px 0 #5A3C1E;">🎬 Video → Strip</button>
+    <input type="file" id="upload-video-input" accept="video/*" style="display:none;">
     <input id="q" placeholder="Ara (isim)…">
     <select id="type">
       <option value="">Tüm tipler</option>
@@ -1008,7 +1010,113 @@ document.getElementById('q').oninput = e => { filter.q = e.target.value; render(
 document.getElementById('cat').onchange = e => { filter.cat = e.target.value; render(); };
 document.getElementById('ext').onchange = e => { filter.ext = e.target.value; render(); };
 document.getElementById('type').onchange = e => { filter.type = e.target.value; render(); };
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeEditor(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeEditor(); closeVideoEditor(); } });
+
+// ---- Video → Strip pipeline ----------------------------------------------
+let activeVideoEditor = null;
+let activeVideoObjectURL = null;
+
+function closeVideoEditor() {
+  const modal = document.getElementById('editor-modal');
+  if (modal) modal.classList.remove('open');
+  if (activeVideoEditor && activeVideoEditor.destroy) {
+    try { activeVideoEditor.destroy(); } catch (_) {}
+  }
+  activeVideoEditor = null;
+  if (activeVideoObjectURL) {
+    try { URL.revokeObjectURL(activeVideoObjectURL); } catch (_) {}
+    activeVideoObjectURL = null;
+  }
+}
+
+function pickAnimName(defaultName) {
+  const v = prompt('Animation name? (file will be saved as <name>-<frames>f.png)', defaultName);
+  if (!v) return null;
+  // Sanitize: lowercase, dash-separated, alphanumeric + dash/underscore
+  const cleaned = String(v).trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+  return cleaned || null;
+}
+
+async function blobToBase64(blob) {
+  const buf = await blob.arrayBuffer();
+  const u8 = new Uint8Array(buf);
+  const CHUNK = 0x8000;
+  let bin = '';
+  for (let i = 0; i < u8.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, u8.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+function openVideoEditor(file) {
+  if (!window.ImageEditor || typeof window.ImageEditor.mountVideoToStrip !== 'function') {
+    toast('Video → Strip: coming soon (image-editor API not yet shipped)', 'err');
+    return;
+  }
+  const sizeMB = file.size / (1024 * 1024);
+  if (sizeMB > 100) {
+    toast(`Large video: ${sizeMB.toFixed(1)}MB — processing may be slow`, 'err');
+  }
+  const defaultName = `anim-${Date.now()}`;
+  const userName = pickAnimName(defaultName);
+  if (!userName) return;
+
+  activeVideoObjectURL = URL.createObjectURL(file);
+  const modal = document.getElementById('editor-modal');
+  modal.innerHTML = '';
+  modal.classList.add('open');
+  const host = document.createElement('div');
+  host.className = 'editor-host';
+  modal.appendChild(host);
+
+  try {
+    activeVideoEditor = window.ImageEditor.mountVideoToStrip({
+      container: host,
+      videoSrc: activeVideoObjectURL,
+      onApply: async (out) => {
+        try {
+          if (!out || !out.stripBlob) {
+            toast('Video editor produced no strip output.', 'err');
+            return;
+          }
+          const frames = out.frames || 1;
+          const fileName = `${userName}-${frames}f.png`;
+          const targetPath = `www/assets/sliced/uploads/${fileName}`;
+          const pngBase64 = await blobToBase64(out.stripBlob);
+          toast('Saving strip to GitHub...', 'ok');
+          const res = await fetch('/api/save-edits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assetPath: targetPath, pngBase64 }),
+          });
+          const j = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            toast('Save failed: ' + (j.error || res.status), 'err');
+            return;
+          }
+          toast(`Saved ${fileName} (${frames} frames). Manifest will refresh.`, 'ok');
+          closeVideoEditor();
+        } catch (e) {
+          toast('Save error: ' + (e.message || e), 'err');
+        }
+      },
+      onCancel: () => closeVideoEditor(),
+    });
+  } catch (e) {
+    toast('Failed to mount video editor: ' + (e.message || e), 'err');
+    closeVideoEditor();
+  }
+}
+
+document.getElementById('upload-video-btn').addEventListener('click', () => {
+  document.getElementById('upload-video-input').click();
+});
+document.getElementById('upload-video-input').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ''; // allow re-selecting same file
+  if (!file) return;
+  openVideoEditor(file);
+});
 
 load();
 </script>
