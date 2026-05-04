@@ -50,6 +50,8 @@ if (fs.existsSync(editorSrcDir)) {
   fs.mkdirSync(libDst, { recursive: true });
   fs.copyFileSync(path.join(editorSrcDir, 'image-editor.js'), path.join(libDst, 'image-editor.js'));
   fs.copyFileSync(path.join(editorSrcDir, 'image-editor.css'), path.join(libDst, 'image-editor.css'));
+  const v2sSrc = path.join(editorSrcDir, 'video-to-strip.js');
+  if (fs.existsSync(v2sSrc)) fs.copyFileSync(v2sSrc, path.join(libDst, 'video-to-strip.js'));
 }
 
 console.log(`Copied ${manifest.count} assets to ${OUT}`);
