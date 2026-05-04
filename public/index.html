@@ -237,8 +237,8 @@
   .st-blocked { background:#8B5847; color:#FFF9E8; }
   .deny-reason { margin:8px 0; padding:10px; background:#FCE0E0; border-left:4px solid #C04040; color:#5A1818; font-size:12px; border-radius:6px; font-weight:500; }
 </style>
-<link rel="stylesheet" href="lib/image-editor.css?v=1">
-<script src="lib/image-editor.js?v=1"></script>
+<link rel="stylesheet" href="lib/image-editor.css?v=2">
+<script src="lib/image-editor.js?v=2"></script>
 </head>
 <body>
 <header>
@@ -506,7 +506,7 @@ function render() {
     const flagTag = (tab === 'have' && isFlagged) ? ` <span class="tag" style="background:#c47a18;color:#1a1510;font-weight:600;" title="İnceleme listesinde">İncelemede</span>` : '';
     return `
     <div class="card">
-      <div class="thumb" onclick="openModal('${i.id}')">${thumbInner}<button class="edit-btn" onclick="event.stopPropagation();openEditor('${i.src}', '${i.file}')" title="Düzenle">✏️ Düzenle</button></div>
+      <div class="thumb" onclick="openModal('${i.id}')">${thumbInner}<button class="edit-btn" onclick="event.stopPropagation();openEditor('${i.id}')" title="Düzenle">✏️ Düzenle</button></div>
       <div class="info">
         <div class="n">${i.name}</div>
         <div class="d"><span>${i.dim || '—'}</span><span>${fmtSize(i.size)}</span></div>
@@ -916,21 +916,70 @@ function openModal(id) {
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 
 let activeEditor = null;
-function openEditor(src, file) {
+// Resolve a manifest item to its on-disk repo path (e.g. www/assets/sliced/balls/ball-09.png).
+// Prefers canonicalPath (already relative to www/), then runtimeDir+file, then strips the
+// "./assets/<tag>/" public mirror prefix and reconstructs from config.json sources.
+function resolveRepoPath(item) {
+  if (!item) return null;
+  if (item.canonicalPath) {
+    let p = String(item.canonicalPath).replace(/^\/+/, '');
+    if (!p.startsWith('www/')) p = 'www/' + p;
+    return p;
+  }
+  if (item.runtimeDir) {
+    const dir = String(item.runtimeDir).replace(/^\/+|\/+$/g, '');
+    return `${dir}/${item.file}`;
+  }
+  // Fallback: ./assets/<tag>/<file> -> look up config.sources by tag.
+  // We don't have config in client; bail and let the user know.
+  return null;
+}
+function openEditor(id) {
+  const item = (data.items || []).find(x => x.id === id);
+  if (!item) { toast('Asset not found: ' + id, 'err'); return; }
+  const repoPath = resolveRepoPath(item);
   const modal = document.getElementById('editor-modal');
   modal.innerHTML = '';
   modal.classList.add('open');
   activeEditor = window.ImageEditor.mount({
     container: modal,
-    src: src,
-    onApply: (edits) => {
-      const editsStr = JSON.stringify({ [file]: edits }, null, 2);
-      const blob = new Blob([editsStr], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'overrides.json';
-      a.click();
-      closeEditor();
+    src: item.src,
+    sourceName: item.name,
+    onApply: async (out) => {
+      try {
+        if (!repoPath) {
+          toast('Cannot save: no canonicalPath. Re-run scan-assets.', 'err');
+          return;
+        }
+        if (!out || !out.pngBlob) {
+          toast('Editor produced no PNG output.', 'err');
+          return;
+        }
+        // Convert blob -> base64 string (no data: prefix; the API strips it anyway).
+        const buf = await out.pngBlob.arrayBuffer();
+        let bin = '';
+        const u8 = new Uint8Array(buf);
+        const CHUNK = 0x8000;
+        for (let i = 0; i < u8.length; i += CHUNK) {
+          bin += String.fromCharCode.apply(null, u8.subarray(i, i + CHUNK));
+        }
+        const pngBase64 = btoa(bin);
+        toast('Saving to GitHub...', 'ok');
+        const res = await fetch('/api/save-edits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetPath: repoPath, pngBase64 }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast('Save failed: ' + (j.error || res.status), 'err');
+          return;
+        }
+        toast('Saved! Manifest auto-regenerates via GH workflow.', 'ok');
+        closeEditor();
+      } catch (e) {
+        toast('Save error: ' + (e.message || e), 'err');
+      }
     },
     onCancel: () => closeEditor()
   });
