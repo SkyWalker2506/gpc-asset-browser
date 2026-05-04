@@ -327,7 +327,7 @@ async function load() {
     const editId = params.get('edit');
     if (editId) {
       const found = (data.items || []).find(x => x.id === editId || x.canonicalId === editId || x.file === editId);
-      if (found) openEditor(found.src, found.file);
+      if (found) openEditor(found.id);
       else console.warn('[asset-browser] ?edit=' + editId + ' not found in manifest');
     }
   } catch (e) { console.warn('[asset-browser] edit deep-link failed:', e && e.message); }
