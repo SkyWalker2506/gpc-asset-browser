@@ -29,10 +29,16 @@ export default async function handler(req, res) {
     if (action === 'deny') item.denyReason = reason;
     else delete item.denyReason;
 
-    // On approve: copy uploaded file to runtime dir (as-is, no split)
+    // On approve: copy uploaded file to runtime dir (as-is, no split).
+    // CRITICAL: runtimeDir MUST come from item.runtimeDir (explicit per-item).
+    // Old behavior used a regex against config.sources[].category which matched
+    // "Ball Skins (in-game)" for everything → non-ball assets ended up in
+    // www/assets/sliced/balls/. We now require explicit metadata or fall
+    // back to the canonical dropbox uploadPrefix (a safe quarantine).
     if (action === 'approve' && item.uploadedFile) {
-      const runtimeDir = (config.sources || []).find(s => /in.?game|runtime/i.test(s.category || ''))?.dir
-        || (config.sources || [])[0]?.dir;
+      const runtimeDir = (typeof item.runtimeDir === 'string' && item.runtimeDir.trim())
+        ? item.runtimeDir.trim().replace(/^\/+|\/+$/g, '')
+        : uploadPrefix; // canonical fallback dropbox — not a guessed source dir
       if (runtimeDir) {
         const ext = (item.uploadedFile.split('.').pop() || 'png').toLowerCase();
         const runtimePath = `${runtimeDir}/${item.name}.${ext}`;
@@ -59,10 +65,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // If transitioning from approved → denied/reopen, remove runtime file from repo
+    // If transitioning from approved → denied/reopen, remove runtime file from repo.
+    // Must mirror the same explicit runtimeDir resolution as approve (no regex).
     if (prevStatus === 'approved' && action !== 'approve') {
-      const runtimeDir = (config.sources || []).find(s => /in.?game|runtime/i.test(s.category || ''))?.dir
-        || (config.sources || [])[0]?.dir;
+      const runtimeDir = (typeof item.runtimeDir === 'string' && item.runtimeDir.trim())
+        ? item.runtimeDir.trim().replace(/^\/+|\/+$/g, '')
+        : uploadPrefix;
       if (runtimeDir) {
         for (const ext of ['webp', 'png', 'gif', 'jpg']) {
           const path = `${runtimeDir}/${item.name}.${ext}`;

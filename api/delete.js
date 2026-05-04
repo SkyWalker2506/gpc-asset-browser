@@ -28,9 +28,12 @@ export default async function handler(req, res) {
       try { await moveToTrash(token, config, branch, filePath, uploadPrefix, `delete ${item.status}`); } catch {}
     }
 
-    // Move runtime asset to trash too
-    const runtimeDir = (config.sources || []).find(s => /in.?game|runtime/i.test(s.category || ''))?.dir
-      || (config.sources || [])[0]?.dir;
+    // Move runtime asset to trash too. Use explicit item.runtimeDir; fall back
+    // to the canonical uploadPrefix dropbox. Never regex-match config.sources —
+    // that bug routed non-ball assets into www/assets/sliced/balls/.
+    const runtimeDir = (typeof item.runtimeDir === 'string' && item.runtimeDir.trim())
+      ? item.runtimeDir.trim().replace(/^\/+|\/+$/g, '')
+      : uploadPrefix;
     if (runtimeDir) {
       for (const ext of ['webp', 'png', 'gif', 'jpg']) {
         const rp = `${runtimeDir}/${item.name}.${ext}`;
