@@ -499,7 +499,8 @@ function render() {
   );
   if (!filtered.length) { g.innerHTML = '<div class="empty">Eşleşen asset yok.</div>'; return; }
   g.innerHTML = filtered.map(i => {
-    let thumbInner = `<img loading="lazy" src="${i.src}" alt="${i.name}">`;
+    const _abs = resolveAbsoluteSrc(i);
+    let thumbInner = `<img loading="lazy" src="${_abs}" alt="${i.name}">`;
     // Animation playback: if strip with N frames (dim like "WxH" where W = H*N)
     if (i.type === 'Animasyon' && i.dim) {
       const m = i.dim.match(/^(\d+)x(\d+)$/);
@@ -513,7 +514,7 @@ function render() {
           const dispH = 128, dispW = Math.min(128, Math.round(frameW * (dispH / h)));
           const endX = -((frames - 1) * dispW);
           const dur = (frames / 8).toFixed(2);
-          thumbInner = `<div class="anim-frame" style="width:${dispW}px;height:${dispH}px;background-image:url('${i.src}');background-size:${dispW * frames}px ${dispH}px;--end:${endX}px;animation:sprite-play ${dur}s steps(${frames - 1}) infinite;"></div>`;
+          thumbInner = `<div class="anim-frame" style="width:${dispW}px;height:${dispH}px;background-image:url('${_abs}');background-size:${dispW * frames}px ${dispH}px;--end:${endX}px;animation:sprite-play ${dur}s steps(${frames - 1}) infinite;"></div>`;
         }
       }
     }
@@ -526,7 +527,7 @@ function render() {
         <div class="n">${i.name}</div>
         <div class="d"><span>${i.dim || '—'}</span><span>${fmtSize(i.size)}</span></div>
         <span class="tag">${i.kind}</span> <span class="tag" style="background:${i.type==='Animasyon'?'#8b4d1e':'#3a2d1d'}">${i.type}</span>${flagTag}
-        <a class="dl" href="${i.src}" download="${i.file}" onclick="event.stopPropagation()">İndir</a>
+        <a class="dl" href="${_abs}" download="${i.file}" onclick="event.stopPropagation()">İndir</a>
         ${tab === 'review' ? `<button class="dl" style="background:#7a5a1f;border:none;cursor:pointer;" onclick="event.stopPropagation();editReviewNote(${JSON.stringify(i.file).replace(/"/g,'&quot;')})" title="Not düzenle">${escapeHtml(i._flag?.note || 'Not ekle')}</button><button class="dl" style="background:#3a5d2d;border:none;cursor:pointer;" onclick="event.stopPropagation();unflagReview(${JSON.stringify(i.file).replace(/"/g,'&quot;')})">Düzeldi</button>` : (isFlagged ? `<button class="dl" style="background:#3a5d2d;border:none;cursor:pointer;" onclick="event.stopPropagation();unflagReview(${JSON.stringify(i.file).replace(/"/g,'&quot;')})">İncelemeyi Kaldır</button>` : `<button class="dl" style="background:#7a5a1f;border:none;cursor:pointer;" onclick="event.stopPropagation();flagReview(${JSON.stringify(i.file).replace(/"/g,'&quot;')},${JSON.stringify(sourceDirFor(i)).replace(/"/g,'&quot;')})">İncele</button>`)}
         <button class="dl" style="background:#4d1f1f;border:none;cursor:pointer;" onclick="event.stopPropagation();deleteAsset(${JSON.stringify(i.file).replace(/"/g,'&quot;')},${JSON.stringify(sourceDirFor(i)).replace(/"/g,'&quot;')}${tab === 'review' ? ',true' : ''})">Sil</button>
       </div>
@@ -890,7 +891,8 @@ function fmtSize(b) {
 function openModal(id) {
   const i = data.items.find(x => x.id === id);
   if (!i) return;
-  let previewInner = `<img src="${i.src}">`;
+  const _absSrc = resolveAbsoluteSrc(i);
+  let previewInner = `<img src="${_absSrc}">`;
   if (i.type === 'Animasyon' && i.dim) {
     const m = i.dim.match(/^(\d+)x(\d+)$/);
     const nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
@@ -904,9 +906,9 @@ function openModal(id) {
         previewInner = `
           <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
             <div style="font-size:11px;color:#5A3C1E;font-weight:600;">Oyun içi görünüm (${frames} frame @ 8 FPS)</div>
-            <div style="width:${dispW}px;height:${dispH}px;background-image:url('${i.src}');background-repeat:no-repeat;background-size:${dispW * frames}px ${dispH}px;animation:sprite-play ${dur}s steps(${frames-1}) infinite;--end:${endX}px;image-rendering:-webkit-optimize-contrast;"></div>
+            <div style="width:${dispW}px;height:${dispH}px;background-image:url('${_absSrc}');background-repeat:no-repeat;background-size:${dispW * frames}px ${dispH}px;animation:sprite-play ${dur}s steps(${frames-1}) infinite;--end:${endX}px;image-rendering:-webkit-optimize-contrast;"></div>
             <div style="font-size:11px;color:#8b6b3d;">Ham strip:</div>
-            <img src="${i.src}" style="max-width:100%;">
+            <img src="${_absSrc}" style="max-width:100%;">
           </div>`;
       }
     }
@@ -923,7 +925,7 @@ function openModal(id) {
       <div class="row"><span class="k">Dosya</span><span>${fmtSize(i.size)}</span></div>
       <div class="row"><span class="k">Dosya adı</span><span style="word-break:break-all;">${i.file}</span></div>
       <div class="row"><span class="k">Güncellenme</span><span>${new Date(i.mtime).toLocaleDateString()}</span></div>
-      <a class="dl" href="${i.src}" download="${i.file}">İndir (${i.ext.toUpperCase()})</a>
+      <a class="dl" href="${_absSrc}" download="${i.file}">İndir (${i.ext.toUpperCase()})</a>
     </div>`;
   document.getElementById('modal').classList.add('open');
 }
@@ -949,6 +951,22 @@ function resolveRepoPath(item) {
   // We don't have config in client; bail and let the user know.
   return null;
 }
+function resolveAbsoluteSrc(item) {
+  // item.src is relative (e.g. "./assets/ball/ball-01.png").
+  // The actual PNG lives on the game Vercel deployment, not this asset-browser domain.
+  // Use config.gameOrigin when set; fall back to canonicalPath-based absolute URL.
+  const gameOrigin = (config && config.gameOrigin) ? config.gameOrigin.replace(/\/$/, '') : null;
+  if (gameOrigin && item.canonicalPath) {
+    // canonicalPath = "assets/sliced/balls/ball-01.png" → absolute on game origin
+    return gameOrigin + '/' + String(item.canonicalPath).replace(/^\/+/, '');
+  }
+  if (gameOrigin && item.src) {
+    return gameOrigin + '/' + String(item.src).replace(/^\.\//, '');
+  }
+  // Fallback: return item.src as-is (relative, may fail cross-origin)
+  return item.src || '';
+}
+
 function openEditor(id) {
   const item = (data.items || []).find(x => x.id === id);
   if (!item) { toast('Asset not found: ' + id, 'err'); return; }
@@ -961,7 +979,7 @@ function openEditor(id) {
   modal.appendChild(host);
   activeEditor = window.ImageEditor.mount({
     container: host,
-    src: item.src,
+    src: resolveAbsoluteSrc(item),
     sourceName: item.name,
     onApply: async (out) => {
       try {
