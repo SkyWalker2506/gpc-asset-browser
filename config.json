@@ -37,6 +37,7 @@
     { "dir": "www/assets/incoming", "category": "Source Sheets (Raw)", "tag": "source-sheets" }
   ],
   "github": { "owner": "SkyWalker2506", "repo": "golf-paper-craft", "branch": "main" },
+  "vercelDeployHook": "",
   "uploadPath": "www/assets/sliced/uploads",
   "dataPath": "asset-browser/data",
   "trashPath": "asset-browser/data/trash"

@@ -311,6 +311,108 @@ let review = { items: [] };
 let config = null;
 let lastAction = null; // for undo
 
+// Map<assetId, objectURL> — populated from IndexedDB on load, updated on publish
+const localOverrides = new Map();
+
+// --- IndexedDB helpers ---
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('gpc-asset-overrides', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('overrides', { keyPath: 'id' });
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = e => rej(e.target.error);
+  });
+}
+async function idbSaveOverride(assetId, blob, animMeta) {
+  try {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('overrides', 'readwrite');
+      tx.objectStore('overrides').put({ id: assetId, blob, animMeta, ts: Date.now() });
+      tx.oncomplete = () => res();
+      tx.onerror = e => rej(e.target.error);
+    });
+  } catch (e) { console.warn('idbSaveOverride failed', e); }
+}
+async function idbGetOverride(assetId) {
+  try {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const req = db.transaction('overrides').objectStore('overrides').get(assetId);
+      req.onsuccess = e => res(e.target.result || null);
+      req.onerror = e => rej(e.target.error);
+    });
+  } catch (e) { return null; }
+}
+async function idbClearOverride(assetId) {
+  try {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('overrides', 'readwrite');
+      tx.objectStore('overrides').delete(assetId);
+      tx.oncomplete = () => res();
+      tx.onerror = e => rej(e.target.error);
+    });
+  } catch (e) { console.warn('idbClearOverride failed', e); }
+}
+async function idbClearStaleOverrides(manifestItems) {
+  try {
+    const db = await idbOpen();
+    const all = await new Promise((res, rej) => {
+      const req = db.transaction('overrides').objectStore('overrides').getAll();
+      req.onsuccess = e => res(e.target.result);
+      req.onerror = e => rej(e.target.error);
+    });
+    for (const entry of all) {
+      const item = manifestItems.find(x => x.id === entry.id);
+      if (item && new Date(item.mtime).getTime() > entry.ts) {
+        await idbClearOverride(entry.id);
+        const url = localOverrides.get(entry.id);
+        if (url) { URL.revokeObjectURL(url); localOverrides.delete(entry.id); }
+      }
+    }
+  } catch (e) { console.warn('idbClearStaleOverrides failed', e); }
+}
+async function idbRebuildLocalOverrides() {
+  try {
+    const db = await idbOpen();
+    const all = await new Promise((res, rej) => {
+      const req = db.transaction('overrides').objectStore('overrides').getAll();
+      req.onsuccess = e => res(e.target.result);
+      req.onerror = e => rej(e.target.error);
+    });
+    for (const entry of all) {
+      const prev = localOverrides.get(entry.id);
+      if (prev) URL.revokeObjectURL(prev);
+      localOverrides.set(entry.id, URL.createObjectURL(entry.blob));
+    }
+  } catch (e) { console.warn('idbRebuildLocalOverrides failed', e); }
+}
+
+// --- URL state sync ---
+function syncUrlParams() {
+  const p = new URLSearchParams();
+  if (filter.q) p.set('q', filter.q);
+  if (filter.cat) p.set('cat', filter.cat);
+  if (filter.type) p.set('type', filter.type);
+  if (tab && tab !== 'have') p.set('tab', tab);
+  // preserve ?asset= if modal is open
+  const cur = new URLSearchParams(location.search);
+  if (cur.get('asset')) p.set('asset', cur.get('asset'));
+  const qs = p.toString();
+  history.replaceState(null, '', qs ? '?' + qs : location.pathname);
+}
+function restoreStateFromUrl() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('q')) { filter.q = p.get('q'); document.getElementById('q').value = filter.q; }
+  if (p.get('cat')) { filter.cat = p.get('cat'); document.getElementById('cat').value = filter.cat; }
+  if (p.get('type')) { filter.type = p.get('type'); document.getElementById('type').value = filter.type; }
+  if (p.get('tab') && p.get('tab') !== 'have') {
+    const btn = document.querySelector(`.tab[data-tab="${p.get('tab')}"]`);
+    if (btn) btn.click();
+  }
+}
+
 function sourceDirFor(item) {
   if (!config) return '';
   // review tab items carry sourceDir directly
@@ -332,6 +434,11 @@ async function load() {
     fetch('/api/review-flag?' + Date.now()).then(x => x.ok ? x.json() : Promise.reject()).catch(() => fetch('./review.json').then(x => x.json())).catch(() => ({ items: [] })),
   ]);
   data = r; missing = m; config = c; review = rv;
+  // Wire Vercel deploy hook if present in config
+  if (config?.vercelDeployHook) window._DEPLOY_HOOK_URL = config.vercelDeployHook;
+  // Rebuild local overrides map from IndexedDB, then clear stale entries
+  await idbRebuildLocalOverrides();
+  await idbClearStaleOverrides(data.items || []);
   updateTabVisibility();
   // probe trash count (public endpoint)
   fetch('/api/trash').then(x => x.json()).then(t => {
@@ -352,6 +459,20 @@ async function load() {
       else console.warn('[asset-browser] ?edit=' + editId + ' not found in manifest');
     }
   } catch (e) { console.warn('[asset-browser] edit deep-link failed:', e && e.message); }
+
+  // Restore filter + tab state from URL params
+  restoreStateFromUrl();
+  render();
+
+  // Restore open modal from ?asset= param
+  try {
+    const _p2 = new URLSearchParams(location.search);
+    const assetId = _p2.get('asset');
+    if (assetId) {
+      const found = (data.items || []).find(x => x.id === assetId);
+      if (found) setTimeout(() => openModal(found.id), 100);
+    }
+  } catch (e) { console.warn('[asset-browser] asset deep-link failed:', e && e.message); }
 }
 
 const STATUS_FOR_TAB = {
@@ -526,7 +647,7 @@ function render() {
     const isFlagged = (review.items || []).some(r => r.file === i.file);
     const flagTag = (tab === 'have' && isFlagged) ? ` <span class="tag" style="background:#c47a18;color:#1a1510;font-weight:600;" title="İnceleme listesinde">İncelemede</span>` : '';
     return `
-    <div class="card">
+    <div class="card" data-id="${i.id}">
       <div class="thumb" onclick="openModal('${i.id}')">${thumbInner}<button class="edit-btn" onclick="event.stopPropagation();openEditor('${i.id}')" title="Düzenle">✏️ Düzenle</button></div>
       <div class="info">
         <div class="n">${i.name}</div>
@@ -562,6 +683,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.getElementById('chips').style.display = isHaveLike ? '' : 'none';
   updateMeta();
   render();
+  syncUrlParams();
 });
 
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
@@ -963,6 +1085,13 @@ function openModal(id) {
       </div>
     </div>`;
   document.getElementById('modal').classList.add('open');
+  // Sync URL with open asset
+  const _urlP = new URLSearchParams(location.search);
+  _urlP.set('asset', id);
+  history.replaceState(null, '', '?' + _urlP.toString());
+  // Scroll to card
+  const _card = document.querySelector(`.card[data-id="${id}"]`);
+  if (_card) _card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
   // Wire animation section interactivity.
   const cbAnim = document.getElementById('ab-is-animation');
@@ -1021,7 +1150,13 @@ function openModal(id) {
   });
 }
 
-function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  const _p = new URLSearchParams(location.search);
+  _p.delete('asset');
+  const _qs = _p.toString();
+  history.replaceState(null, '', _qs ? '?' + _qs : location.pathname);
+}
 
 let activeEditor = null;
 // Resolve a manifest item to its on-disk repo path (e.g. www/assets/sliced/balls/ball-09.png).
@@ -1043,6 +1178,8 @@ function resolveRepoPath(item) {
   return null;
 }
 function resolveAbsoluteSrc(item) {
+  // Check local IndexedDB override first (optimistic cache after publish)
+  if (localOverrides.has(item.id)) return localOverrides.get(item.id);
   // Always prefer the local /assets/ path — assets are copied into public/assets/ at build time.
   // The gameOrigin is only used for save-back (resolveRepoPath), not for serving images.
   return item.src || '';
@@ -1100,6 +1237,7 @@ function openEditor(id) {
           toast('Save failed: ' + (j.error || res.status), 'err');
           return;
         }
+        if (window._DEPLOY_HOOK_URL) { fetch(window._DEPLOY_HOOK_URL, { method: 'POST' }).catch(() => {}); }
         toast('Saved! Manifest auto-regenerates via GH workflow.', 'ok');
         closeEditor();
       } catch (e) {
@@ -1147,9 +1285,13 @@ function openEditor(id) {
         if (!metaRes.ok) {
           toast('File saved but manifest update failed: ' + (metaJ.error || metaRes.status), 'err');
         } else {
-          toast('Published! Strip + manifest updated. Refreshing...', 'ok');
+          // Save optimistic preview to IndexedDB
+          await idbSaveOverride(item.id, payload.stripBlob, animMeta);
+          // Trigger Vercel deploy hook if configured
+          if (window._DEPLOY_HOOK_URL) { fetch(window._DEPLOY_HOOK_URL, { method: 'POST' }).catch(() => {}); }
+          toast('Published! Local preview active — deploy takes 1-2 min', 'ok');
           closeEditor();
-          setTimeout(() => location.reload(), 1800);
+          refreshLocalView(item.id, payload.stripBlob);
         }
       } catch (e) {
         toast('Publish error: ' + (e.message || e), 'err');
@@ -1158,15 +1300,39 @@ function openEditor(id) {
     onCancel: () => closeEditor()
   });
 }
+function refreshLocalView(assetId, blob) {
+  // Revoke old objectURL if any
+  const prev = localOverrides.get(assetId);
+  if (prev) URL.revokeObjectURL(prev);
+  const url = URL.createObjectURL(blob);
+  localOverrides.set(assetId, url);
+  // Update card thumbnail
+  const card = document.querySelector(`.card[data-id="${assetId}"]`);
+  if (card) {
+    const img = card.querySelector('.thumb img');
+    if (img) img.src = url;
+    const anim = card.querySelector('.anim-frame');
+    if (anim) anim.style.backgroundImage = `url('${url}')`;
+  }
+  // Update modal preview if open for this asset
+  const modalBox = document.getElementById('box');
+  if (modalBox && document.getElementById('modal').classList.contains('open')) {
+    const mimg = modalBox.querySelector('.preview img');
+    if (mimg) mimg.src = url;
+    const manim = modalBox.querySelector('[style*="background-image"]');
+    if (manim) manim.style.backgroundImage = `url('${url}')`;
+  }
+}
+
 function closeEditor() {
   document.getElementById('editor-modal').classList.remove('open');
   if (activeEditor && activeEditor.destroy) { activeEditor.destroy(); activeEditor = null; }
 }
 
-document.getElementById('q').oninput = e => { filter.q = e.target.value; render(); };
-document.getElementById('cat').onchange = e => { filter.cat = e.target.value; render(); };
+document.getElementById('q').oninput = e => { filter.q = e.target.value; render(); syncUrlParams(); };
+document.getElementById('cat').onchange = e => { filter.cat = e.target.value; render(); syncUrlParams(); };
 document.getElementById('ext').onchange = e => { filter.ext = e.target.value; render(); };
-document.getElementById('type').onchange = e => { filter.type = e.target.value; render(); };
+document.getElementById('type').onchange = e => { filter.type = e.target.value; render(); syncUrlParams(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeEditor(); closeVideoEditor(); } });
 
 // ---- Video → Strip pipeline ----------------------------------------------
