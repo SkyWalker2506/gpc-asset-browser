@@ -434,7 +434,7 @@
     let imgReady = false;
     let edits = normalizeEdits(opts.edits || {});
     let aspect = 'free';
-    let zoom = 1;
+    let zoom = 0;
     let pan = { x: 0, y: 0 };
     let dragging = null;
     let cropDragOrig = null;
@@ -494,6 +494,7 @@
 
     function setSrc(src) {
       imgReady = false;
+      zoom = 0;  // reset so ResizeObserver re-runs fitView when modal opens
       sliceChildren = null;
       stopAnimPreview();
 
@@ -503,7 +504,13 @@
         el.onload = () => {
           img = el;
           imgReady = true;
-          requestAnimationFrame(() => { fitView(); render(); });
+          // Only fit+render immediately if the canvas has real dimensions.
+          // If the modal is still hidden (0×0), the ResizeObserver will call
+          // fitView()+render() once the modal becomes visible.
+          const _cv = ui ? ui.canvas : null;
+          if (_cv && _cv.clientWidth > 0 && _cv.clientHeight > 0) {
+            requestAnimationFrame(() => { fitView(); render(); });
+          }
         };
         el.onerror = () => {
           if (useCors) {
@@ -836,7 +843,7 @@
         fitCanvasBuffer();
         // If the canvas just got real dimensions (e.g. modal opened from display:none),
         // and the image is ready but zoom was never computed, run fitView first.
-        if (imgReady && zoom < 0.001) fitView();
+        if (imgReady && zoom < 0.05) fitView();
         render();
       });
       ro.observe(ui.canvas);
@@ -1151,9 +1158,24 @@
         const cy = dy + cr.y * zoom;
         const cw = cr.w * zoom;
         const ch = cr.h * zoom;
+        // Draw dark overlay. Then punch out crop area and redraw image there so
+        // image pixels are not erased by clearRect.
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.fillRect(0, 0, cv.width / dpr, cv.height / dpr);
         ctx.clearRect(cx, cy, cw, ch);
+        // Redraw image inside the crop window so pixels are visible.
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(cx, cy, cw, ch);
+        ctx.clip();
+        const fs2 = buildFilterString(edits.filter);
+        if (fs2) ctx.filter = fs2;
+        const previewCv2 = bakedSource();
+        ctx.drawImage(previewCv2, 0, 0, previewCv2.width, previewCv2.height,
+                      dx + (edits.crop ? edits.crop.x * zoom : 0),
+                      dy + (edits.crop ? edits.crop.y * zoom : 0),
+                      previewCv2.width * zoom, previewCv2.height * zoom);
+        ctx.restore();
         ctx.strokeStyle = '#ffb347';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([5, 4]);
