@@ -193,6 +193,33 @@
   #confirm-yes:hover { background: #9a2626; }
   #confirm-no  { background: #FBF5E0; color: #5A3C1E; }
   #confirm-no:hover { background: #ede5cc; }
+  /* === Editor Navigation Bar === */
+  .ab-editor-nav {
+    width: 100%;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 8px 0 0 0;
+    border-top: 1.5px dashed rgba(139,88,71,0.35);
+    margin-top: 6px;
+  }
+  .ab-editor-nav a {
+    display: inline-block;
+    padding: 5px 12px; border-radius: 8px;
+    background: #F0E4C0; border: 1.5px solid #B07A48;
+    color: #5A3C1E; text-decoration: none;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .ab-editor-nav a:hover {
+    border-color: #5A3C1E; background: #E8D5A8;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 0 rgba(43,29,18,0.18);
+  }
+  @media (max-width: 600px) {
+    .ab-editor-nav { overflow-x: auto; flex-wrap: nowrap; }
+    .ab-editor-nav a { flex-shrink: 0; }
+  }
+  /* === end Editor Nav === */
   .tab {
     background: #FFF9E8; border: 1.5px solid #B07A48; color: #5A3C1E;
     padding: 8px 16px; border-radius: 10px; cursor: pointer;
@@ -282,6 +309,13 @@
       <option value="">Tüm formatlar</option>
     </select>
   </div>
+  <nav class="ab-editor-nav">
+    <a href="https://golf-paper-craft.vercel.app/editor.html" target="_blank" rel="noopener">🌱 Level</a>
+    <a href="https://golf-paper-craft.vercel.app/physics-editor.html" target="_blank" rel="noopener">⚙ Physics</a>
+    <a href="https://golf-paper-craft.vercel.app/course-editor.html" target="_blank" rel="noopener">🌍 Courses</a>
+    <a href="https://golf-paper-craft.vercel.app/ui-editor.html" target="_blank" rel="noopener">🎛 UI</a>
+    <a href="https://golf-paper-craft.vercel.app/assets-library.html" target="_blank" rel="noopener">📦 Library</a>
+  </nav>
 </header>
 <div class="chips" id="chips"></div>
 <div class="grid" id="grid"></div>
