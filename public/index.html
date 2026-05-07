@@ -253,16 +253,10 @@
   .st-approved, .st-done { background:#9DCB55; color:#2B1D12; }
   .st-blocked { background:#8B5847; color:#FFF9E8; }
   .deny-reason { margin:8px 0; padding:10px; background:#FCE0E0; border-left:4px solid #C04040; color:#5A1818; font-size:12px; border-radius:6px; font-weight:500; }
-  .staged-badge {
-    position: absolute; bottom: 2px; left: 2px;
-    background: #7c3aed; color: #fff;
-    font-size: 9px; font-weight: 700;
-    padding: 1px 4px; border-radius: 3px;
-    pointer-events: none; z-index: 2;
-  }
+
 </style>
-<link rel="stylesheet" href="lib/image-editor.css?v=13">
-<script src="lib/image-editor.js?v=13"></script>
+<link rel="stylesheet" href="lib/image-editor.css?v=14">
+<script src="lib/image-editor.js?v=14"></script>
 <script src="lib/video-to-strip.js?v=1"></script>
 <!-- Firebase JS SDK (client) — public read only, no auth required -->
 <script type="module">
@@ -293,8 +287,8 @@ onSnapshot(doc(fbDb, 'golf-paper-craft', 'manifest'), snap => {
     const id = card.dataset.id;
     const entry = window._fbManifestOverrides[id];
     if (!entry || !entry.url) return;
-    // Only update if not locally staged (stagedAssets wins)
-    if (typeof stagedAssets !== 'undefined' && stagedAssets.has(id)) return;
+    // Only update if not locally overridden (localOverrides wins)
+    if (localOverrides.has(id)) return;
     const img = card.querySelector('.thumb img');
     if (img && img.src !== entry.url) img.src = entry.url;
     const anim = card.querySelector('.anim-frame');
@@ -329,7 +323,6 @@ onSnapshot(doc(fbDb, 'golf-paper-craft', 'animation-meta'), snap => {
     <button class="tab" data-tab="trash" id="trash-tab" style="display:none;">Çöp</button>
   </div>
   <div class="controls">
-    <button id="publish-all-btn" style="display:none;background:#7c3aed;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">💾 Publish all staged (0)</button>
     <button class="tab" id="upload-video-btn" title="Video → Animation Strip" style="background:linear-gradient(180deg,#E8A040 0%,#D08020 100%);color:#FFF9E8;border-color:#5A3C1E;box-shadow:0 2px 0 #5A3C1E;">🎬 Video → Strip</button>
     <input type="file" id="upload-video-input" accept="video/*" style="display:none;">
     <input id="q" placeholder="Ara (isim)…">
@@ -1188,7 +1181,6 @@ function openModal(id) {
       <div class="row"><span class="k">Dosya adı</span><span style="word-break:break-all;">${i.file}</span></div>
       <div class="row"><span class="k">Güncellenme</span><span>${new Date(i.mtime).toLocaleDateString()}</span></div>
       <a class="dl" href="${_absSrc}" download="${i.file}">İndir (${i.ext.toUpperCase()})</a>
-      ${stagedAssets.has(i.id) ? `<div style="margin:10px 0 4px;"><button onclick="discardStaged('${i.id}')" style="padding:5px 12px;font-size:12px;border:2px solid #7c3aed;border-radius:6px;background:transparent;color:#7c3aed;cursor:pointer;font-weight:600;">↺ Discard staged changes</button><span style="font-size:11px;color:#7c3aed;margin-left:8px;">Unpublished local edits</span></div>` : ''}
       <div style="margin:14px 0 6px;font-weight:700;color:#5A3C1E;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;border-top:1px dashed rgba(139,88,71,0.3);padding-top:12px;">Animation</div>
       <label style="display:flex;align-items:center;gap:6px;padding:6px 0;cursor:pointer;font-size:13px;">
         <input type="checkbox" id="ab-is-animation" ${_isAnim ? 'checked' : ''}> This asset is an animation strip
@@ -1337,21 +1329,29 @@ function openEditor(id) {
     onApply: async (out) => {
       try {
         if (!out || !out.pngBlob) { toast('Editor produced no PNG output.', 'err'); return; }
-        await idbSaveStaged(item.id, out.pngBlob, null, out.edits, repoPath);
-        const prevEntry = stagedAssets.get(item.id);
-        if (prevEntry && prevEntry.objectURL) URL.revokeObjectURL(prevEntry.objectURL);
+        // Optimistic local update
         const objectURL = URL.createObjectURL(out.pngBlob);
-        stagedAssets.set(item.id, { blob: out.pngBlob, animMeta: null, edits: out.edits, repoPath, objectURL });
         const prevLO = localOverrides.get(item.id);
         if (prevLO) URL.revokeObjectURL(prevLO);
         localOverrides.set(item.id, objectURL);
-        toast('Applied locally — click "Publish all staged" to send to GitHub', 'ok');
+        await idbSaveOverride(item.id, out.pngBlob, null);
         refreshLocalView(item.id, out.pngBlob);
-        updateStagedBadges();
-        updatePublishAllBtn();
         closeEditor();
+        toast('Publishing...', 'ok');
+        const pngBase64 = await blobToBase64(out.pngBlob);
+        const res = await fetch('/api/save-edits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetPath: repoPath, pngBase64 }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || res.status);
+        }
+        toast('Published', 'ok');
+        if (window._DEPLOY_HOOK_URL) fetch(window._DEPLOY_HOOK_URL, { method: 'POST' }).catch(() => {});
       } catch (e) {
-        toast('Stage error: ' + (e.message || e), 'err');
+        toast('Publish failed: ' + (e.message || e), 'err');
       }
     },
     onSliceApply: async (payload) => {
@@ -1365,21 +1365,34 @@ function openEditor(id) {
           layout: 'horizontal-strip',
           customCells: payload.params?._cells || null
         };
-        await idbSaveStaged(item.id, payload.stripBlob, animMeta, null, repoPath);
-        const prevEntry = stagedAssets.get(item.id);
-        if (prevEntry && prevEntry.objectURL) URL.revokeObjectURL(prevEntry.objectURL);
+        // Optimistic local update
         const objectURL = URL.createObjectURL(payload.stripBlob);
-        stagedAssets.set(item.id, { blob: payload.stripBlob, animMeta, edits: null, repoPath, objectURL });
         const prevLO = localOverrides.get(item.id);
         if (prevLO) URL.revokeObjectURL(prevLO);
         localOverrides.set(item.id, objectURL);
-        toast('Slice staged locally — click "Publish all staged" to send to GitHub', 'ok');
+        await idbSaveOverride(item.id, payload.stripBlob, animMeta);
         refreshLocalView(item.id, payload.stripBlob);
-        updateStagedBadges();
-        updatePublishAllBtn();
         closeEditor();
+        toast('Publishing...', 'ok');
+        const pngBase64 = await blobToBase64(payload.stripBlob);
+        const res = await fetch('/api/save-edits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetPath: repoPath, pngBase64 }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || res.status);
+        }
+        await fetch('/api/save-animation-meta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetId: item.id, animation: animMeta }),
+        }).catch(() => {});
+        toast('Published', 'ok');
+        if (window._DEPLOY_HOOK_URL) fetch(window._DEPLOY_HOOK_URL, { method: 'POST' }).catch(() => {});
       } catch (e) {
-        toast('Stage error: ' + (e.message || e), 'err');
+        toast('Publish failed: ' + (e.message || e), 'err');
       }
     },
     onCancel: () => closeEditor()
@@ -1409,90 +1422,10 @@ function refreshLocalView(assetId, blob) {
   }
 }
 
-function updateStagedBadges() {
-  document.querySelectorAll('.card').forEach(card => {
-    const id = card.dataset.id;
-    const thumb = card.querySelector('.thumb');
-    if (!thumb) return;
-    let badge = card.querySelector('.staged-badge');
-    if (stagedAssets.has(id)) {
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'staged-badge';
-        badge.textContent = '● Staged';
-        thumb.style.position = 'relative';
-        thumb.appendChild(badge);
-      }
-    } else {
-      if (badge) badge.remove();
-    }
-  });
-}
-function updatePublishAllBtn() {
-  const btn = document.getElementById('publish-all-btn');
-  if (!btn) return;
-  const count = stagedAssets.size;
-  btn.style.display = count > 0 ? '' : 'none';
-  btn.textContent = `💾 Publish all staged (${count})`;
-}
-async function publishAllStaged() {
-  const entries = Array.from(stagedAssets.entries());
-  if (!entries.length) { toast('Nothing staged.', 'err'); return; }
-  const btn = document.getElementById('publish-all-btn');
-  if (btn) btn.disabled = true;
-  let success = 0, fail = 0;
-  for (let i = 0; i < entries.length; i++) {
-    const [assetId, staged] = entries[i];
-    toast(`Publishing ${i + 1}/${entries.length}...`, 'ok');
-    try {
-      const pngBase64 = await blobToBase64(staged.blob);
-      const res = await fetch('/api/save-edits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assetPath: staged.repoPath, pngBase64 }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) { fail++; toast(`Failed ${assetId}: ${j.error || res.status}`, 'err'); continue; }
-      if (staged.animMeta) {
-        await fetch('/api/save-animation-meta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assetId, animation: staged.animMeta }),
-        }).catch(() => {});
-      }
-      // Promote to overrides (permanent local cache)
-      await idbSaveOverride(assetId, staged.blob, staged.animMeta);
-      await idbClearStaged(assetId);
-      stagedAssets.delete(assetId);
-      success++;
-    } catch (e) {
-      fail++;
-      toast(`Error ${assetId}: ${e.message}`, 'err');
-    }
-  }
-  if (success > 0 && window._DEPLOY_HOOK_URL) {
-    fetch(window._DEPLOY_HOOK_URL, { method: 'POST' }).catch(() => {});
-  }
-  if (btn) btn.disabled = false;
-  toast(fail === 0 ? `All ${success} published!` : `${success} published, ${fail} failed`, fail === 0 ? 'ok' : 'err');
-  updateStagedBadges();
-  updatePublishAllBtn();
-}
-async function discardStaged(assetId) {
-  await idbClearStaged(assetId);
-  const entry = stagedAssets.get(assetId);
-  if (entry && entry.objectURL) URL.revokeObjectURL(entry.objectURL);
-  stagedAssets.delete(assetId);
-  // Remove from localOverrides — fall back to published version or manifest
-  const prevLO = localOverrides.get(assetId);
-  if (prevLO) URL.revokeObjectURL(prevLO);
-  localOverrides.delete(assetId);
-  toast('Staged changes discarded', 'ok');
-  updateStagedBadges();
-  updatePublishAllBtn();
-  closeModal();
-  render();
-}
+function updateStagedBadges() {}
+function updatePublishAllBtn() {}
+async function publishAllStaged() {}
+async function discardStaged(assetId) {}
 function closeEditor() {
   document.getElementById('editor-modal').classList.remove('open');
   if (activeEditor && activeEditor.destroy) { activeEditor.destroy(); activeEditor = null; }
