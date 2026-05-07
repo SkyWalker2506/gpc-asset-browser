@@ -126,6 +126,25 @@ for (const s of CONFIG.sources || []) {
 
 items.sort((a, b) => a.name.localeCompare(b.name));
 
+// Merge animation-meta sidecar (data/animation-meta.json) into items.
+const SIDECAR_PATH = path.resolve(ROOT, 'data/animation-meta.json');
+if (fs.existsSync(SIDECAR_PATH)) {
+  try {
+    const sidecar = JSON.parse(fs.readFileSync(SIDECAR_PATH, 'utf8'));
+    const meta = sidecar.meta || {};
+    let merged = 0;
+    for (const item of items) {
+      if (meta[item.id]) {
+        item.animation = meta[item.id];
+        merged++;
+      }
+    }
+    console.log(`Animation sidecar: ${merged} items merged from data/animation-meta.json`);
+  } catch (e) {
+    console.warn('Failed to read animation-meta sidecar:', e.message);
+  }
+}
+
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(MANIFEST_OUT, JSON.stringify({
   generated: new Date().toISOString(),
