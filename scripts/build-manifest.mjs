@@ -94,6 +94,11 @@ for (const s of CONFIG.sources || []) {
       scannedHits++;
     }
 
+    // Derive repo-relative path for save-back (always set so resolveRepoPath works).
+    const derivedCanonicalPath = canon
+      ? (canon.path.startsWith('www/') ? canon.path : 'www/' + canon.path)
+      : path.relative(PROJECT_ROOT, full).replace(/\\/g, '/');
+
     items.push({
       id: `${s.tag}-${base}`,
       name: base,
@@ -107,10 +112,10 @@ for (const s of CONFIG.sources || []) {
       size,
       dim,
       mtime,
+      canonicalPath: derivedCanonicalPath,
       // Pass canonical fields through when available (frontend can ignore).
       ...(canon ? {
         canonicalId: canon.id,
-        canonicalPath: canon.path,
         tags: canon.tags,
         ...(canon.course ? { course: canon.course } : {}),
         ...(canon.frameCount ? { frameCount: canon.frameCount } : {}),
