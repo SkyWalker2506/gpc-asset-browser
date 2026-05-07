@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "meta": {
+    "anim-c1-croc-idle-7f": {
+      "frames": 7,
+      "fps": 8,
+      "layout": "horizontal-strip",
+      "frameW": 293,
+      "frameH": 256
+    }
+  }
+}
