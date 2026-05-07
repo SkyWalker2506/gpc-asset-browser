@@ -956,13 +956,8 @@ function resolveRepoPath(item) {
   return null;
 }
 function resolveAbsoluteSrc(item) {
-  const gameOrigin = (config && config.gameOrigin) ? config.gameOrigin.replace(/\/$/, '') : null;
-  if (gameOrigin && item.canonicalPath) {
-    return gameOrigin + '/' + String(item.canonicalPath).replace(/^\/+/, '');
-  }
-  if (gameOrigin && item.src) {
-    return gameOrigin + '/' + String(item.src).replace(/^\.\//, '');
-  }
+  // Always prefer the local /assets/ path — assets are copied into public/assets/ at build time.
+  // The gameOrigin is only used for save-back (resolveRepoPath), not for serving images.
   return item.src || '';
 }
 function openEditor(id) {
