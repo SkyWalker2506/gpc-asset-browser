@@ -1,4 +1,4 @@
-/* gpc-image-editor v0.5.0 — non-destructive in-browser mini photoshop for game sprites.
+/* gpc-image-editor v0.5.1 — non-destructive in-browser mini photoshop for game sprites.
  *
  * Companion module: video-to-strip.js exposes
  *   window.ImageEditor.mountVideoToStrip({ container, videoSrc, sourceName, onApply, onCancel })
@@ -565,8 +565,10 @@
             render();
           }
         };
-        // Cache-bust to avoid stale tainted-canvas from a prior no-cors load
-        el.src = src ? (src + (src.includes('?') ? '&' : '?') + '_iecb=' + Date.now()) : '';
+        // Cache-bust to avoid stale tainted-canvas from a prior no-cors load.
+        // blob: and data: URLs do not support query strings — skip cache-bust for those.
+        const _isBlobOrData = src && (src.startsWith('blob:') || src.startsWith('data:'));
+        el.src = src ? (_isBlobOrData ? src : (src + (src.includes('?') ? '&' : '?') + '_iecb=' + Date.now())) : '';
       }
 
       img = new Image(); // reset immediately so render shows blank not stale
@@ -584,6 +586,7 @@
 
     function destroy() {
       stopAnimPreview();
+      window.removeEventListener('keydown', onKey);
       container.innerHTML = '';
       container.classList.remove('gpc-ie-root');
     }
@@ -634,6 +637,7 @@
           </div>
           <div class="gpc-ie-group gpc-ie-grow"></div>
           <div class="gpc-ie-group">
+            <button data-ie="back"   class="gpc-ie-btn-back" title="Asset Browser'a dön">&#8592; Geri</button>
             <button data-ie="cancel" class="gpc-ie-btn-ghost">Cancel</button>
             <button data-ie="apply"  class="gpc-ie-btn-primary" style="padding:6px 18px;font-size:13px">Apply</button>
           </div>
@@ -742,7 +746,7 @@
         flipH: $('[data-ie="flip-h"]'), flipV: $('[data-ie="flip-v"]'),
         undo: $('[data-ie="undo"]'), redo: $('[data-ie="redo"]'),
         reset: $('[data-ie="reset"]'), fit: $('[data-ie="fit-bbox"]'),
-        cancel: $('[data-ie="cancel"]'), apply: $('[data-ie="apply"]'),
+        back: $('[data-ie="back"]'), cancel: $('[data-ie="cancel"]'), apply: $('[data-ie="apply"]'),
         toolBtns: root.querySelectorAll('[data-ie-tool]'),
         toolTitle: $('[data-ie="tool-title"]'),
         toolBody:  $('[data-ie="tool-body"]'),
@@ -791,6 +795,7 @@
       ui.fit.addEventListener('click', () => {
         if (edits.crop) { edits.resize = { w: edits.crop.w, h: edits.crop.h }; commit(); syncControls(); }
       });
+      if (ui.back) ui.back.addEventListener('click', () => { if (typeof opts.onCancel === 'function') opts.onCancel(); });
       ui.cancel.addEventListener('click', () => { if (typeof opts.onCancel === 'function') opts.onCancel(); });
       ui.apply.addEventListener('click', () => {
         if (typeof opts.onApply !== 'function') return;
@@ -1478,10 +1483,12 @@
           ctx.fillStyle = isSelected ? '#00ddff' : '#ffb347';
           ctx.fillText(String(i + 1), dx + cell.x * zoom + 4, dy + cell.y * zoom + 2);
           if (isSelected) {
-            const hx = dx + (cell.x + cell.w) * zoom - 5;
-            const hy = dy + (cell.y + cell.h) * zoom - 5;
+            const midY = dy + (cell.y + cell.h / 2) * zoom;
             ctx.fillStyle = '#00ddff';
-            ctx.fillRect(hx, hy, 10, 10);
+            // right-middle handle
+            ctx.fillRect(dx + (cell.x + cell.w) * zoom - 4, midY - 4, 8, 8);
+            // left-middle handle
+            ctx.fillRect(dx + cell.x * zoom - 4, midY - 4, 8, 8);
           }
         });
       } else if (sliceMode === 'grid') {
@@ -1666,8 +1673,31 @@
         return;
       }
 
-      // Per-cell anim: click canvas to select cell
+      // Per-cell anim: drag handles or click to select
       if (activeTool === 'slice' && sliceMode === 'anim') {
+        // Check handles on selected cell first
+        if (animSelectedCell >= 0 && animSelectedCell < animCells.length) {
+          const sc = animCells[animSelectedCell];
+          const midY = sc.y + sc.h / 2;
+          const handleR = 6; // hit radius in image-space (scales with zoom via screen px / zoom)
+          const hRadX = handleR / zoom;
+          const hRadY = handleR / zoom;
+          // right-middle handle
+          if (Math.abs(ipt.x - (sc.x + sc.w)) <= hRadX && Math.abs(ipt.y - midY) <= hRadY) {
+            dragging = 'anim-resize-right';
+            cropDragOrig = { ...sc, cellIdx: animSelectedCell, pointerX: ipt.x };
+            try { ui.canvas.setPointerCapture(ev.pointerId); } catch (_) {}
+            return;
+          }
+          // left-middle handle
+          if (Math.abs(ipt.x - sc.x) <= hRadX && Math.abs(ipt.y - midY) <= hRadY) {
+            dragging = 'anim-resize-left';
+            cropDragOrig = { ...sc, cellIdx: animSelectedCell, pointerX: ipt.x };
+            try { ui.canvas.setPointerCapture(ev.pointerId); } catch (_) {}
+            return;
+          }
+        }
+        // Click inside a cell to select it
         let hit = -1;
         for (let i = 0; i < animCells.length; i++) {
           const c = animCells[i];

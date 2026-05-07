@@ -254,10 +254,32 @@
   .st-approved, .st-done { background:#9DCB55; color:#2B1D12; }
   .st-blocked { background:#8B5847; color:#FFF9E8; }
   .deny-reason { margin:8px 0; padding:10px; background:#FCE0E0; border-left:4px solid #C04040; color:#5A1818; font-size:12px; border-radius:6px; font-weight:500; }
-
+  .sheet-card .thumb {
+    background: linear-gradient(135deg, #1a1d24 0%, #2d3040 100%);
+    border-bottom-color: #E8A040;
+  }
+  .sheet-badge {
+    position: absolute; top: 6px; left: 6px;
+    background: linear-gradient(180deg, #E8A040 0%, #D08020 100%);
+    color: #1a1510; font-size: 9px; font-weight: 700;
+    padding: 2px 7px; border-radius: 999px; border: 1px solid #5A3C1E;
+    z-index: 10;
+  }
+  .sliced-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 6px; margin-top: 8px;
+  }
+  .sliced-thumb {
+    aspect-ratio: 1; background: linear-gradient(135deg, #DDF0FF 0%, #C6E45C 100%);
+    border: 1.5px solid #B07A48; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; cursor: pointer; transition: transform .1s;
+  }
+  .sliced-thumb:hover { transform: scale(1.08); border-color: #5A3C1E; }
+  .sliced-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
 </style>
-<link rel="stylesheet" href="lib/image-editor.css?v=14">
-<script src="lib/image-editor.js?v=14"></script>
+<link rel="stylesheet" href="lib/image-editor.css?v=15">
+<script src="lib/image-editor.js?v=15"></script>
 <script src="lib/video-to-strip.js?v=1"></script>
 <!-- Firebase JS SDK (client) — public read only, no auth required -->
 <script type="module">
@@ -540,7 +562,7 @@ function sourceDirFor(item) {
   return s ? s.dir : '';
 }
 let tab = 'have';
-let filter = { q: '', cat: '', ext: '', kind: '', type: '' };
+let filter = { q: '', cat: '', ext: '', kind: '', type: '', sheetOnly: false };
 
 async function load() {
   const [r, m, c, rv] = await Promise.all([
@@ -655,17 +677,23 @@ function fillSelect(id, values) {
 }
 
 function buildChips() {
-  const kinds = [...new Set(data.items.map(i => i.kind))].sort();
+  const kinds = [...new Set(data.items.filter(i => !i.isSheet).map(i => i.kind))].sort();
+  const sheetCount = data.items.filter(i => i.isSheet).length;
   const c = document.getElementById('chips');
   c.innerHTML = '';
   const all = chip('Tümü', ''); all.classList.add('active');
-  all.onclick = () => { filter.kind = ''; activateChip(all); render(); };
+  all.onclick = () => { filter.kind = ''; filter.sheetOnly = false; activateChip(all); render(); };
   c.appendChild(all);
   kinds.forEach(k => {
-    const ch = chip(`${k} (${data.items.filter(i => i.kind === k).length})`, k);
-    ch.onclick = () => { filter.kind = k; activateChip(ch); render(); };
+    const ch = chip(k + ' (' + data.items.filter(i => !i.isSheet && i.kind === k).length + ')', k);
+    ch.onclick = () => { filter.kind = k; filter.sheetOnly = false; activateChip(ch); render(); };
     c.appendChild(ch);
   });
+  if (sheetCount > 0) {
+    const sheetChip = chip('Sprite Sheet (' + sheetCount + ')', 'sheet');
+    sheetChip.onclick = () => { filter.kind = ''; filter.sheetOnly = true; activateChip(sheetChip); render(); };
+    c.appendChild(sheetChip);
+  }
 }
 
 function chip(label, value) {
@@ -738,7 +766,8 @@ function render() {
     (!filter.cat || i.category === filter.cat) &&
     (!filter.ext || i.ext === filter.ext) &&
     (!filter.kind || i.kind === filter.kind) &&
-    (!filter.type || i.type === filter.type)
+    (!filter.type || i.type === filter.type) &&
+    (filter.sheetOnly ? !!i.isSheet : !i.isSheet)
   );
   if (!filtered.length) { g.innerHTML = '<div class="empty">Eşleşen asset yok.</div>'; return; }
   g.innerHTML = filtered.map(i => {
@@ -764,8 +793,8 @@ function render() {
     const isFlagged = (review.items || []).some(r => r.file === i.file);
     const flagTag = (tab === 'have' && isFlagged) ? ` <span class="tag" style="background:#c47a18;color:#1a1510;font-weight:600;" title="İnceleme listesinde">İncelemede</span>` : '';
     return `
-    <div class="card" data-id="${i.id}">
-      <div class="thumb" onclick="openModal('${i.id}')">${thumbInner}<button class="edit-btn" onclick="event.stopPropagation();openEditor('${i.id}')" title="Düzenle">✏️ Düzenle</button></div>
+    <div class="card${i.isSheet ? ' sheet-card' : ''}" data-id="${i.id}">
+      <div class="thumb" onclick="openModal('${i.id}')">${i.isSheet ? '<span class="sheet-badge">SHEET</span>' : ''}${thumbInner}<button class="edit-btn" onclick="event.stopPropagation();openEditor('${i.id}')" title="Düzenle">✏️ Düzenle</button></div>
       <div class="info">
         <div class="n">${i.name}</div>
         <div class="d"><span>${i.dim || '—'}</span><span>${fmtSize(i.size)}</span></div>
@@ -1202,6 +1231,30 @@ function openModal(id) {
         ${_savedAnim.frames ? `<div style="font-size:11px;color:#3a7d44;margin-top:4px;">Saved: ${_savedAnim.frames}f @ ${_savedAnim.fps}fps (${_savedAnim.layout})</div>` : ''}
       </div>
     </div>`;
+
+  // Sheet: append slicedAssets section
+  if (i.isSheet && i.slicedAssets && i.slicedAssets.length) {
+    const detailsEl = document.getElementById('box').querySelector('.details');
+    const sheetAssets = i.slicedAssets.map(aid => data.items.find(x => x.id === aid)).filter(Boolean);
+    const slicedSection = document.createElement('div');
+    slicedSection.style.cssText = 'margin-top:14px;border-top:1px dashed rgba(139,88,71,0.3);padding-top:12px;';
+    slicedSection.innerHTML = '<div style="font-weight:700;color:#5A3C1E;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Bu sheetten kesilen assetler (' + sheetAssets.length + ')</div><div class="sliced-grid">' +
+      sheetAssets.map(sa => {
+        const saAbs = resolveAbsoluteSrc(sa);
+        const saIdEsc = sa.id.replace(/'/g, "\\'");
+        return '<div class="sliced-thumb" onclick="closeModal();setTimeout(function(){openModal(\'' + saIdEsc + '\')},50)" title="' + sa.name + '"><img loading="lazy" src="' + saAbs + '" alt="' + sa.name + '"></div>';
+      }).join('') + '</div>';
+    if (detailsEl) detailsEl.appendChild(slicedSection);
+  }
+  if (i.isSheet) {
+    const detailsEl = document.getElementById('box').querySelector('.details');
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Edit Sheet (Slice Mode)';
+    editBtn.style.cssText = 'margin-top:12px;width:100%;padding:9px;border-radius:8px;border:2px solid #5A3C1E;background:linear-gradient(180deg,#E8A040 0%,#D08020 100%);color:#1a1510;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;';
+    editBtn.onclick = function() { closeModal(); openEditor(i.id); };
+    if (detailsEl) detailsEl.appendChild(editBtn);
+  }
+
   document.getElementById('modal').classList.add('open');
   // Sync URL with open asset
   const _urlP = new URLSearchParams(location.search);
