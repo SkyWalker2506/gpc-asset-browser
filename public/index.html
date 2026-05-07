@@ -1066,6 +1066,7 @@ function openEditor(id) {
     container: host,
     src: resolveAbsoluteSrc(item),
     sourceName: item.name,
+    assetName: item.name,
     initialTool: _editorIsAnim ? 'slice' : undefined,
     initialSliceMode: _editorIsAnim ? 'anim' : undefined,
     initialSliceParams: (_editorIsAnim && _editorFrameCount) ? { cols: _editorFrameCount, rows: 1 } : undefined,
