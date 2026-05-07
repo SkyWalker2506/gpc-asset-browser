@@ -62,6 +62,58 @@ function dimsFromCanonical(a) {
   return '';
 }
 
+const INCOMING_DIR = path.resolve(PROJECT_ROOT, 'www/assets/incoming');
+
+// Load sourceBbox sidecar (asset-browser/data/source-bbox.json).
+const SOURCE_BBOX_PATH = path.resolve(ROOT, 'data/source-bbox.json');
+let sourceBboxSidecar = {};
+if (fs.existsSync(SOURCE_BBOX_PATH)) {
+  try {
+    sourceBboxSidecar = JSON.parse(fs.readFileSync(SOURCE_BBOX_PATH, 'utf8'));
+    const count = Object.keys(sourceBboxSidecar).length;
+    if (count) console.log(`sourceBbox sidecar: ${count} entries`);
+  } catch (e) { console.warn('Failed to read source-bbox.json:', e.message); }
+} else {
+  // Create empty sidecar so the file exists for API writes.
+  try { fs.writeFileSync(SOURCE_BBOX_PATH, '{}', 'utf8'); } catch (_) {}
+}
+
+/**
+ * Given a sliced canonicalPath like 'www/assets/sliced/batch16/atlas-5-cosmetics/file.png',
+ * derive the likely source sheet path in www/assets/incoming/.
+ * Tries multiple naming conventions and returns the first match.
+ * Returns a repo-relative path string, or null if not found.
+ */
+function deriveSourceSheet(canonicalPath) {
+  if (!canonicalPath || !canonicalPath.includes('/sliced/')) return null;
+  if (!fs.existsSync(INCOMING_DIR)) return null;
+  // Strip 'www/assets/sliced/' prefix, split into parts.
+  const rel = canonicalPath.replace(/^www\/assets\/sliced\//, '');
+  const parts = rel.split('/');
+  if (parts.length < 2) return null; // need at least batch/file
+  const batch = parts[0];  // e.g. 'batch16', 'batch11', 'batch8', 'balls'
+  const atlas = parts.length >= 3 ? parts[1] : ''; // e.g. 'atlas-5-cosmetics'
+  // Build candidate filenames to try, in priority order.
+  const candidates = [];
+  if (atlas) {
+    candidates.push(`${batch}-${atlas}-sheet.png`);
+    candidates.push(`${batch}-${atlas}.png`);
+  }
+  // Single-level sliced dir (e.g. batch11, batch8, balls)
+  candidates.push(`${batch}-sheet.png`);
+  candidates.push(`${batch}-reference-sheet.png`);
+  candidates.push(`${batch}-flags-reference-sheet.png`);
+  // Also try without 'sheet' suffix
+  candidates.push(`${batch}.png`);
+  for (const name of candidates) {
+    const candidate = path.join(INCOMING_DIR, name);
+    if (fs.existsSync(candidate)) {
+      return path.relative(PROJECT_ROOT, candidate).replace(/\\/g, '/');
+    }
+  }
+  return null;
+}
+
 const items = [];
 let canonicalHits = 0;
 let scannedHits = 0;
@@ -120,6 +172,14 @@ for (const s of CONFIG.sources || []) {
         ...(canon.course ? { course: canon.course } : {}),
         ...(canon.frameCount ? { frameCount: canon.frameCount } : {}),
       } : {}),
+      // Source sheet re-crop support: derive source sheet path if available.
+      ...(() => {
+        const itemId = `${s.tag}-${base}`;
+        const sheet = deriveSourceSheet(derivedCanonicalPath);
+        if (!sheet) return {};
+        const bbox = sourceBboxSidecar[itemId] || null;
+        return { sourceSheet: sheet, sourceBbox: bbox };
+      })(),
     });
   }
 }

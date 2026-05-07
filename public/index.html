@@ -558,6 +558,7 @@ async function load() {
   data = r; missing = m; config = c; review = rv;
   // Wire Vercel deploy hook if present in config
   if (config?.vercelDeployHook) window._DEPLOY_HOOK_URL = config.vercelDeployHook;
+  if (config?.gameOrigin) window._GAME_ORIGIN = config.gameOrigin;
   // Rebuild local overrides map from IndexedDB, then clear stale entries
   await idbRebuildLocalOverrides();
   await rebuildStagedAssets();
@@ -1188,6 +1189,7 @@ function openModal(id) {
       <div class="row"><span class="k">Dosya adı</span><span style="word-break:break-all;">${i.file}</span></div>
       <div class="row"><span class="k">Güncellenme</span><span>${new Date(i.mtime).toLocaleDateString()}</span></div>
       <a class="dl" href="${_absSrc}" download="${i.file}">İndir (${i.ext.toUpperCase()})</a>
+      ${i.sourceSheet ? `<div style="margin:10px 0 0;"><button id="ab-from-sheet-btn" style="padding:6px 14px;font-size:13px;border:2px solid #5A3C1E;border-radius:8px;background:#FFF9E8;color:#5A3C1E;cursor:pointer;font-weight:600;">From sheet</button>${i.sourceBbox ? `<div style="font-size:11px;color:#8B5847;margin-top:4px;">Bbox: ${i.sourceBbox.x},${i.sourceBbox.y} ${i.sourceBbox.w}×${i.sourceBbox.h}</div>` : '<div style="font-size:11px;color:#8B5847;margin-top:4px;">No bbox set — adjust crop in editor</div>'}</div>` : ''}
       ${stagedAssets.has(i.id) ? `<div style="margin:10px 0 4px;"><button onclick="discardStaged('${i.id}')" style="padding:5px 12px;font-size:12px;border:2px solid #7c3aed;border-radius:6px;background:transparent;color:#7c3aed;cursor:pointer;font-weight:600;">↺ Discard staged changes</button><span style="font-size:11px;color:#7c3aed;margin-left:8px;">Unpublished local edits</span></div>` : ''}
       <div style="margin:14px 0 6px;font-weight:700;color:#5A3C1E;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;border-top:1px dashed rgba(139,88,71,0.3);padding-top:12px;">Animation</div>
       <label style="display:flex;align-items:center;gap:6px;padding:6px 0;cursor:pointer;font-size:13px;">
@@ -1210,6 +1212,14 @@ function openModal(id) {
       </div>
     </div>`;
   document.getElementById('modal').classList.add('open');
+  // Wire "From sheet" button if present.
+  const _fromSheetBtn = document.getElementById('ab-from-sheet-btn');
+  if (_fromSheetBtn) {
+    _fromSheetBtn.addEventListener('click', () => {
+      closeModal();
+      openEditorFromSheet(i);
+    });
+  }
   // Sync URL with open asset
   const _urlP = new URLSearchParams(location.search);
   _urlP.set('asset', id);
@@ -1385,6 +1395,87 @@ function openEditor(id) {
     onCancel: () => closeEditor()
   });
 }
+
+// Open the image-editor loaded with the ORIGINAL source sheet, with the
+// asset's current sourceBbox pre-set as the initial crop overlay.
+// The user can drag/resize to expand/shift the crop, then Apply to replace the asset.
+function openEditorFromSheet(item) {
+  if (!item || !item.sourceSheet) return;
+  // Resolve the source sheet URL.
+  // item.sourceSheet = 'www/assets/incoming/batch16-atlas-5-cosmetics-sheet.png'
+  // The asset-browser Vercel project serves its own /assets/ via public/assets/.
+  // Source sheets live in the main game repo's www/, accessible via gameOrigin.
+  const gameOrigin = (window._GAME_ORIGIN || '').replace(/\/$/, '');
+  const sheetRelPath = item.sourceSheet.replace(/^www\//, '');
+  const sheetSrc = gameOrigin
+    ? (gameOrigin + '/' + sheetRelPath)
+    : ('/game-assets/' + sheetRelPath); // local dev fallback (proxy not guaranteed)
+
+  const initialCrop = (item.sourceBbox && typeof item.sourceBbox.w === 'number')
+    ? { x: item.sourceBbox.x, y: item.sourceBbox.y, w: item.sourceBbox.w, h: item.sourceBbox.h }
+    : null;
+
+  const repoPath = resolveRepoPath(item);
+  const modal = document.getElementById('editor-modal');
+  modal.innerHTML = '';
+  modal.classList.add('open');
+
+  // Banner
+  const banner = document.createElement('div');
+  banner.style.cssText = 'background:#5A3C1E;color:#FBF5E0;padding:8px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;flex-shrink:0;';
+  banner.innerHTML = '<span>Source sheet re-crop:</span><span style="font-weight:400;word-break:break-all;flex:1;">' + item.sourceSheet + '</span>' +
+    (initialCrop ? '<span style="font-size:11px;opacity:0.7;">Bbox pre-set — drag handles to adjust</span>' : '<span style="font-size:11px;opacity:0.7;">No saved bbox — draw crop area</span>') +
+    '<button onclick="closeEditor()" style="margin-left:8px;background:transparent;border:1px solid rgba(251,245,224,0.4);color:#FBF5E0;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">Cancel</button>';
+  modal.appendChild(banner);
+
+  const host = document.createElement('div');
+  host.className = 'editor-host';
+  modal.appendChild(host);
+
+  activeEditor = window.ImageEditor.mount({
+    container: host,
+    src: sheetSrc,
+    sourceName: item.name,
+    assetName: item.name,
+    initialTool: 'crop',
+    edits: initialCrop ? { crop: initialCrop } : undefined,
+    onApply: async (out) => {
+      if (!out || !out.pngBlob) { toast('Editor produced no output.', 'err'); return; }
+      try {
+        // Persist new sourceBbox via API.
+        const newBbox = (out.edits && out.edits.crop && out.edits.crop.w > 0)
+          ? { x: Math.round(out.edits.crop.x), y: Math.round(out.edits.crop.y),
+              w: Math.round(out.edits.crop.w), h: Math.round(out.edits.crop.h) }
+          : null;
+        if (newBbox) {
+          fetch('/api/save-source-bbox', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assetId: item.id, bbox: newBbox }),
+          }).catch(e => console.warn('[asset-browser] save-source-bbox failed:', e));
+        }
+        // Stage the new blob.
+        await idbSaveStaged(item.id, out.pngBlob, null, out.edits, repoPath);
+        const prevEntry = stagedAssets.get(item.id);
+        if (prevEntry && prevEntry.objectURL) URL.revokeObjectURL(prevEntry.objectURL);
+        const objectURL = URL.createObjectURL(out.pngBlob);
+        stagedAssets.set(item.id, { blob: out.pngBlob, animMeta: null, edits: out.edits, repoPath, objectURL });
+        const prevLO = localOverrides.get(item.id);
+        if (prevLO) URL.revokeObjectURL(prevLO);
+        localOverrides.set(item.id, objectURL);
+        toast('Cropped from source sheet — click "Publish all staged" to send to GitHub', 'ok');
+        refreshLocalView(item.id, out.pngBlob);
+        updateStagedBadges();
+        updatePublishAllBtn();
+        closeEditor();
+      } catch (e) {
+        toast('Stage error: ' + (e.message || e), 'err');
+      }
+    },
+    onCancel: () => closeEditor(),
+  });
+}
+
 function refreshLocalView(assetId, blob) {
   // Revoke old objectURL if any
   const prev = localOverrides.get(assetId);
