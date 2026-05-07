@@ -145,6 +145,75 @@ if (fs.existsSync(SIDECAR_PATH)) {
   }
 }
 
+// Merge source-sheet-overrides sidecar (data/source-sheet-overrides.json) into items.
+const SOURCE_SHEET_OVERRIDES_PATH = path.resolve(ROOT, 'data/source-sheet-overrides.json');
+if (fs.existsSync(SOURCE_SHEET_OVERRIDES_PATH)) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(SOURCE_SHEET_OVERRIDES_PATH, 'utf8'));
+    const overrides = Object.fromEntries(Object.entries(raw).filter(([k]) => !k.startsWith('_')));
+    let ssWired = 0;
+    for (const item of items) {
+      const ov = overrides[item.id];
+      if (ov && ov.sourceSheet) {
+        const absSheet = path.resolve(PROJECT_ROOT, ov.sourceSheet);
+        if (fs.existsSync(absSheet)) {
+          item.sourceSheet = ov.sourceSheet;
+          if (ov.sourceBbox) item.sourceBbox = ov.sourceBbox;
+          ssWired++;
+        } else {
+          console.warn(`source-sheet not found on disk: ${ov.sourceSheet} (for ${item.id})`);
+        }
+      }
+    }
+    console.log(`Source-sheet overrides: ${ssWired} items wired from data/source-sheet-overrides.json`);
+  } catch (e) {
+    console.warn('Failed to read source-sheet-overrides sidecar:', e.message);
+  }
+}
+
+// Build inverted map: sourceSheetPath -> [assetId, ...] and inject Sprite Sheet items.
+{
+  const sheetMap = new Map();
+  for (const item of items) {
+    if (item.sourceSheet) {
+      if (!sheetMap.has(item.sourceSheet)) sheetMap.set(item.sourceSheet, []);
+      sheetMap.get(item.sourceSheet).push(item.id);
+    }
+  }
+  // Remove existing items that came from the plain source-sheets scan (will be replaced).
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i].src && items[i].src.startsWith('./assets/source-sheets/')) items.splice(i, 1);
+  }
+  // Add enriched sheet items.
+  let addedSheets = 0;
+  for (const [sheetPath, assetIds] of sheetMap.entries()) {
+    const absSheet = path.resolve(PROJECT_ROOT, sheetPath);
+    if (!fs.existsSync(absSheet)) continue;
+    const basename = path.basename(absSheet);
+    const base = path.basename(basename, path.extname(basename));
+    let size = 0; let mtime = '';
+    try { const st = fs.statSync(absSheet); size = st.size; mtime = st.mtime.toISOString(); } catch {}
+    const dim = getDim(absSheet);
+    items.push({
+      id: 'sheet-' + base,
+      name: base,
+      file: basename,
+      ext: 'png',
+      src: './assets/source-sheets/' + basename,
+      srcAbs: absSheet,
+      category: 'Sprite Sheet',
+      kind: 'Sprite Sheet',
+      type: 'Resim',
+      isSheet: true,
+      size, dim, mtime,
+      canonicalPath: 'www/assets/incoming/' + basename,
+      slicedAssets: assetIds,
+    });
+    addedSheets++;
+  }
+  console.log(`Source sheets: ${addedSheets} sheet items added`);
+}
+
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(MANIFEST_OUT, JSON.stringify({
   generated: new Date().toISOString(),
