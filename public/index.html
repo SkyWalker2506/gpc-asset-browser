@@ -26,7 +26,7 @@
     min-height: 100vh;
   }
   header {
-    position: sticky; top: 0; z-index: 10;
+    position: sticky; top: 0; z-index: 50;
     background: linear-gradient(180deg, #FBF5E0 0%, #F0E4C0 100%);
     padding: 16px 24px;
     border-bottom: 3px solid #5A3C1E;
@@ -74,6 +74,7 @@
     border: 2px solid #5A3C1E;
     border-radius: 12px;
     overflow: hidden; cursor: pointer;
+    position: relative;
     transition: transform .15s, box-shadow .15s;
     display: flex; flex-direction: column;
     box-shadow: 0 3px 0 rgba(43,29,18,0.18), 0 0 0 1px rgba(255,255,255,0.6) inset;
@@ -113,7 +114,7 @@
     position: absolute; top: 6px; right: 6px;
     background: rgba(255, 249, 232, 0.9);
     border: 1px solid #5A3C1E; border-radius: 6px;
-    padding: 3px 6px; font-size: 11px; cursor: pointer; z-index: 10;
+    padding: 3px 6px; font-size: 11px; cursor: pointer; z-index: 5;
     font-weight: 700; color: #5A3C1E; display: block; box-shadow: 0 1px 0 rgba(43,29,18,0.2);
   }
   .edit-btn:hover { background: #E8D5A8; }
