@@ -1106,6 +1106,55 @@ function openEditor(id) {
         toast('Save error: ' + (e.message || e), 'err');
       }
     },
+    onSliceApply: async (payload) => {
+      try {
+        if (!repoPath) {
+          toast('Cannot save: no canonicalPath. Re-run scan-assets.', 'err');
+          return;
+        }
+        if (!payload.stripBlob) {
+          toast('No strip output from slicer.', 'err');
+          return;
+        }
+        toast('Publishing strip to GitHub...', 'ok');
+        const pngBase64 = await blobToBase64(payload.stripBlob);
+        // 1. Overwrite the asset file with the new strip.
+        const res = await fetch('/api/save-edits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetPath: repoPath, pngBase64 }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast('Publish failed: ' + (j.error || res.status), 'err');
+          return;
+        }
+        // 2. Update animation metadata in manifest.
+        const animMeta = {
+          frames: payload.frames,
+          fps: payload.params?.fps || item.animation?.fps || 8,
+          frameW: payload.frameW,
+          frameH: payload.frameH,
+          layout: 'horizontal-strip',
+          customCells: payload.params?._cells || null
+        };
+        const metaRes = await fetch('/api/save-animation-meta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetId: item.id, animation: animMeta }),
+        });
+        const metaJ = await metaRes.json().catch(() => ({}));
+        if (!metaRes.ok) {
+          toast('File saved but manifest update failed: ' + (metaJ.error || metaRes.status), 'err');
+        } else {
+          toast('Published! Strip + manifest updated. Refreshing...', 'ok');
+          closeEditor();
+          setTimeout(() => location.reload(), 1800);
+        }
+      } catch (e) {
+        toast('Publish error: ' + (e.message || e), 'err');
+      }
+    },
     onCancel: () => closeEditor()
   });
 }

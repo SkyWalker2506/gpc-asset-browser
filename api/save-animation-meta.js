@@ -40,7 +40,14 @@ export default async function handler(req, res) {
     if (idx === -1) {
       return res.status(404).json({ error: 'Asset not found in manifest: ' + assetId });
     }
-    items[idx] = { ...items[idx], animation: { frames, fps, layout } };
+    const frameW = animation.frameW ? Math.max(1, parseInt(animation.frameW, 10)) : undefined;
+    const frameH = animation.frameH ? Math.max(1, parseInt(animation.frameH, 10)) : undefined;
+    const customCells = Array.isArray(animation.customCells) ? animation.customCells : undefined;
+    const newAnim = { frames, fps, layout };
+    if (frameW) newAnim.frameW = frameW;
+    if (frameH) newAnim.frameH = frameH;
+    if (customCells) newAnim.customCells = customCells;
+    items[idx] = { ...items[idx], animation: newAnim };
     currentJson.items = items;
 
     const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(currentJson, null, 2) + '\n')));
@@ -48,14 +55,14 @@ export default async function handler(req, res) {
       method: 'PUT',
       github: config.github,
       body: {
-        message: `asset-browser: set animation meta for ${assetId} (${frames}f @ ${fps}fps)`,
+        message: `asset-browser: set animation meta for ${assetId} (${frames}f @ ${fps}fps, ${frameW||'?'}x${frameH||'?'})`,
         content: newContent,
         branch,
         sha: existingSha,
       },
     });
 
-    res.json({ ok: true, commitSha: result?.commit?.sha || null, animation: { frames, fps, layout } });
+    res.json({ ok: true, commitSha: result?.commit?.sha || null, animation: newAnim });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
