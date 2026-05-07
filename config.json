@@ -1,6 +1,7 @@
 {
   "title": "Golf Paper Craft",
   "projectRoot": "..",
+  "gameOrigin": "https://golf-paper-craft.vercel.app",
   "sources": [
     { "dir": "www/assets/sliced/balls", "category": "Ball Skins (in-game)", "tag": "ball" },
     { "dir": "www/assets/sliced/menu", "category": "Menu Sprites (sliced)", "tag": "menu" },
