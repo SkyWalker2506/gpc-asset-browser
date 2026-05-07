@@ -10,5 +10,8 @@
     "build": "node scripts/copy-assets.mjs",
     "dev": "npm run build && npx serve public -l 5174",
     "start": "npm run build"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.8.0"
   }
 }

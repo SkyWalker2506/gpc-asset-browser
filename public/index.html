@@ -264,6 +264,56 @@
 <link rel="stylesheet" href="lib/image-editor.css?v=13">
 <script src="lib/image-editor.js?v=13"></script>
 <script src="lib/video-to-strip.js?v=1"></script>
+<!-- Firebase JS SDK (client) — public read only, no auth required -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getFirestore, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+// Public Firestore config — read-only by security rules, safe to expose.
+const fbApp = initializeApp({
+  apiKey: 'AIzaSyCmyZzmRd1XhSxz_bArNcGHiJPTMCrtfwM',
+  authDomain: 'vocab-418e1.firebaseapp.com',
+  projectId: 'vocab-418e1',
+  storageBucket: 'vocab-418e1.firebasestorage.app',
+  messagingSenderId: '387847607962',
+  appId: '1:387847607962:web:95f7ec61d9cf14f07c7123',
+}, 'asset-browser-client');
+const fbDb = getFirestore(fbApp);
+
+// Expose to global scope so the inline <script> block can access it.
+window._fbManifestOverrides = {};
+window._fbAnimMetaOverrides = {};
+
+onSnapshot(doc(fbDb, 'golf-paper-craft', 'manifest'), snap => {
+  if (!snap.exists()) return;
+  const d = snap.data();
+  window._fbManifestOverrides = d.assets || {};
+  // Refresh thumbnails that have been updated in Firebase Storage
+  document.querySelectorAll('.card').forEach(card => {
+    const id = card.dataset.id;
+    const entry = window._fbManifestOverrides[id];
+    if (!entry || !entry.url) return;
+    // Only update if not locally staged (stagedAssets wins)
+    if (typeof stagedAssets !== 'undefined' && stagedAssets.has(id)) return;
+    const img = card.querySelector('.thumb img');
+    if (img && img.src !== entry.url) img.src = entry.url;
+    const anim = card.querySelector('.anim-frame');
+    if (anim) anim.style.backgroundImage = `url('${entry.url}')`;
+  });
+}, err => console.warn('[firebase] manifest listener error:', err));
+
+onSnapshot(doc(fbDb, 'golf-paper-craft', 'animation-meta'), snap => {
+  if (!snap.exists()) return;
+  window._fbAnimMetaOverrides = snap.data() || {};
+  // Patch local data.items animation field with latest from Firestore
+  if (typeof data !== 'undefined' && data.items) {
+    for (const item of data.items) {
+      const fb = window._fbAnimMetaOverrides[item.id];
+      if (fb) item.animation = { ...item.animation, ...fb };
+    }
+  }
+}, err => console.warn('[firebase] animation-meta listener error:', err));
+</script>
 </head>
 <body>
 <header>
@@ -1253,10 +1303,12 @@ function resolveRepoPath(item) {
   return null;
 }
 function resolveAbsoluteSrc(item) {
-  // Check local IndexedDB override first (optimistic cache after publish)
+  // 1. Local staged/override wins (IndexedDB optimistic cache after publish)
   if (localOverrides.has(item.id)) return localOverrides.get(item.id);
-  // Always prefer the local /assets/ path — assets are copied into public/assets/ at build time.
-  // The gameOrigin is only used for save-back (resolveRepoPath), not for serving images.
+  // 2. Firebase Storage CDN URL if available (set by onSnapshot listener)
+  const fbUrl = window._fbManifestOverrides?.[item.id]?.url;
+  if (fbUrl) return fbUrl;
+  // 3. Local /assets/ path (build-time copy)
   return item.src || '';
 }
 function openEditor(id) {
