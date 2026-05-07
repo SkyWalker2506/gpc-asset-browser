@@ -26,7 +26,7 @@
     min-height: 100vh;
   }
   header {
-    position: sticky; top: 0; z-index: 10;
+    position: sticky; top: 0; z-index: 100;
     background: linear-gradient(180deg, #FBF5E0 0%, #F0E4C0 100%);
     padding: 16px 24px;
     border-bottom: 3px solid #5A3C1E;
@@ -77,6 +77,7 @@
     transition: transform .15s, box-shadow .15s;
     display: flex; flex-direction: column;
     box-shadow: 0 3px 0 rgba(43,29,18,0.18), 0 0 0 1px rgba(255,255,255,0.6) inset;
+    isolation: isolate;
   }
   .card:hover {
     transform: translateY(-3px) rotate(-0.4deg);
