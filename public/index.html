@@ -138,7 +138,11 @@
   .modal.open { display: flex; }
   /* Editor modal: full-bleed dark backdrop with explicit-sized inner host so
      image-editor's height:100% grid has something to fill. */
-  #editor-modal { background: rgba(0,0,0,0.85); padding: 0; z-index: 1000; }
+  #editor-modal {
+    background: rgba(0,0,0,0.85); padding: 0; z-index: 1000;
+    width: 100vw; height: 100vh;
+    /* override .modal padding:24px */
+  }
   #editor-modal.open { display: flex; }
   .editor-host {
     width: 95vw; height: 95vh;
@@ -249,8 +253,8 @@
   .st-blocked { background:#8B5847; color:#FFF9E8; }
   .deny-reason { margin:8px 0; padding:10px; background:#FCE0E0; border-left:4px solid #C04040; color:#5A1818; font-size:12px; border-radius:6px; font-weight:500; }
 </style>
-<link rel="stylesheet" href="lib/image-editor.css?v=7">
-<script src="lib/image-editor.js?v=7"></script>
+<link rel="stylesheet" href="lib/image-editor.css?v=8">
+<script src="lib/image-editor.js?v=8"></script>
 <script src="lib/video-to-strip.js?v=1"></script>
 </head>
 <body>
