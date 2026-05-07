@@ -145,6 +145,33 @@ if (fs.existsSync(SIDECAR_PATH)) {
   }
 }
 
+// Merge source-sheet-overrides sidecar (data/source-sheet-overrides.json) into items.
+const SOURCE_SHEET_OVERRIDES_PATH = path.resolve(ROOT, 'data/source-sheet-overrides.json');
+if (fs.existsSync(SOURCE_SHEET_OVERRIDES_PATH)) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(SOURCE_SHEET_OVERRIDES_PATH, 'utf8'));
+    // Strip _comment key if present.
+    const overrides = Object.fromEntries(Object.entries(raw).filter(([k]) => !k.startsWith('_')));
+    let ssWired = 0;
+    for (const item of items) {
+      const ov = overrides[item.id];
+      if (ov && ov.sourceSheet) {
+        const absSheet = path.resolve(PROJECT_ROOT, ov.sourceSheet);
+        if (fs.existsSync(absSheet)) {
+          item.sourceSheet = ov.sourceSheet;
+          if (ov.sourceBbox) item.sourceBbox = ov.sourceBbox;
+          ssWired++;
+        } else {
+          console.warn(`source-sheet not found on disk: ${ov.sourceSheet} (for ${item.id})`);
+        }
+      }
+    }
+    console.log(`Source-sheet overrides: ${ssWired} items wired from data/source-sheet-overrides.json`);
+  } catch (e) {
+    console.warn('Failed to read source-sheet-overrides sidecar:', e.message);
+  }
+}
+
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(MANIFEST_OUT, JSON.stringify({
   generated: new Date().toISOString(),
