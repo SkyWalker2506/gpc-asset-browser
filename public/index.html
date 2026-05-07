@@ -917,6 +917,17 @@ function openModal(id) {
       }
     }
   }
+
+  // Compute animation defaults for the ANIMATION section.
+  const _nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
+  const _dimMatch = (i.dim || '').match(/^(\d+)x(\d+)$/);
+  const _isAnimType = i.type === 'Animasyon';
+  const _isAnim = !!(_isAnimType || i.animation || _nameFrames);
+  const _savedAnim = i.animation || {};
+  let _defFrames = _savedAnim.frames || (_nameFrames ? +_nameFrames : (_dimMatch && +_dimMatch[1] > +_dimMatch[2] ? Math.round(+_dimMatch[1] / +_dimMatch[2]) : 1));
+  const _defFps = _savedAnim.fps || 8;
+  const _defLayout = _savedAnim.layout || 'horizontal-strip';
+
   document.getElementById('box').innerHTML = `
     <div class="preview">${previewInner}</div>
     <div class="details">
@@ -930,8 +941,83 @@ function openModal(id) {
       <div class="row"><span class="k">Dosya adı</span><span style="word-break:break-all;">${i.file}</span></div>
       <div class="row"><span class="k">Güncellenme</span><span>${new Date(i.mtime).toLocaleDateString()}</span></div>
       <a class="dl" href="${_absSrc}" download="${i.file}">İndir (${i.ext.toUpperCase()})</a>
+      <div style="margin:14px 0 6px;font-weight:700;color:#5A3C1E;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;border-top:1px dashed rgba(139,88,71,0.3);padding-top:12px;">Animation</div>
+      <label style="display:flex;align-items:center;gap:6px;padding:6px 0;cursor:pointer;font-size:13px;">
+        <input type="checkbox" id="ab-is-animation" ${_isAnim ? 'checked' : ''}> This asset is an animation strip
+      </label>
+      <div id="ab-anim-fields" style="display:${_isAnim ? 'block' : 'none'};padding-left:4px;">
+        <div class="row"><span class="k">Frame count</span><input type="number" id="ab-frames" value="${_defFrames}" min="1" step="1" style="width:60px;padding:3px 6px;border:1px solid #c9a87c;border-radius:4px;font-size:13px;"></div>
+        <div class="row"><span class="k">FPS</span><input type="number" id="ab-fps" value="${_defFps}" min="1" step="1" style="width:60px;padding:3px 6px;border:1px solid #c9a87c;border-radius:4px;font-size:13px;"></div>
+        <div class="row"><span class="k">Layout</span>
+          <select id="ab-layout" style="padding:3px 6px;border:1px solid #c9a87c;border-radius:4px;font-size:13px;">
+            <option value="horizontal-strip" ${_defLayout === 'horizontal-strip' ? 'selected' : ''}>Horizontal strip</option>
+            <option value="grid" ${_defLayout === 'grid' ? 'selected' : ''}>Grid</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;padding:8px 0 2px;flex-wrap:wrap;">
+          <button id="ab-autodetect" style="padding:5px 10px;font-size:12px;border:1px solid #c9a87c;border-radius:4px;background:#FFF9E8;color:#5A3C1E;cursor:pointer;">Auto-detect frames</button>
+          <button id="ab-save-anim" style="padding:5px 12px;font-size:12px;border:none;border-radius:4px;background:#3a7d44;color:#fff;cursor:pointer;font-weight:600;">Save animation metadata</button>
+        </div>
+        ${_savedAnim.frames ? `<div style="font-size:11px;color:#3a7d44;margin-top:4px;">Saved: ${_savedAnim.frames}f @ ${_savedAnim.fps}fps (${_savedAnim.layout})</div>` : ''}
+      </div>
     </div>`;
   document.getElementById('modal').classList.add('open');
+
+  // Wire animation section interactivity.
+  const cbAnim = document.getElementById('ab-is-animation');
+  const animFields = document.getElementById('ab-anim-fields');
+  cbAnim.addEventListener('change', () => { animFields.style.display = cbAnim.checked ? 'block' : 'none'; });
+
+  document.getElementById('ab-autodetect').addEventListener('click', () => {
+    // Try to detect from filename first, then image dimensions.
+    const fromName = (i.name.match(/[-_](\d+)f/i) || [])[1];
+    if (fromName) {
+      document.getElementById('ab-frames').value = +fromName;
+      toast('Detected ' + fromName + ' frames from filename');
+      return;
+    }
+    if (i.dim) {
+      const dm = i.dim.match(/^(\d+)x(\d+)$/);
+      if (dm && +dm[1] > +dm[2]) {
+        const detected = Math.round(+dm[1] / +dm[2]);
+        document.getElementById('ab-frames').value = detected;
+        toast('Detected ' + detected + ' frames from dimensions');
+        return;
+      }
+    }
+    // Load image and detect.
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalWidth > img.naturalHeight) {
+        const detected = Math.round(img.naturalWidth / img.naturalHeight);
+        document.getElementById('ab-frames').value = detected;
+        toast('Detected ' + detected + ' frames from image size');
+      } else {
+        toast('Could not auto-detect frames — set manually', 'err');
+      }
+    };
+    img.onerror = () => toast('Could not load image for detection', 'err');
+    img.src = _absSrc;
+  });
+
+  document.getElementById('ab-save-anim').addEventListener('click', async () => {
+    const frames = parseInt(document.getElementById('ab-frames').value, 10) || 1;
+    const fps = parseFloat(document.getElementById('ab-fps').value) || 8;
+    const layout = document.getElementById('ab-layout').value || 'horizontal-strip';
+    try {
+      const r = await fetch('/api/save-animation-meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId: i.id, animation: { frames, fps, layout } }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { toast('Save failed: ' + (j.error || r.status), 'err'); return; }
+      toast('Animation metadata saved!');
+      // Update local data so re-opens show saved values.
+      const localItem = data.items.find(x => x.id === i.id);
+      if (localItem) localItem.animation = { frames, fps, layout };
+    } catch (e) { toast('Error: ' + (e.message || e), 'err'); }
+  });
 }
 
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
@@ -970,10 +1056,18 @@ function openEditor(id) {
   const host = document.createElement('div');
   host.className = 'editor-host';
   modal.appendChild(host);
+  // Detect animation strip to set initial slice mode.
+  const _editorNameFrames = (item.name.match(/[-_](\d+)f/i) || [])[1];
+  const _editorIsAnim = !!(item.type === 'Animasyon' || item.animation || _editorNameFrames);
+  const _editorFrameCount = item.animation?.frames || (_editorNameFrames ? +_editorNameFrames : null);
+
   activeEditor = window.ImageEditor.mount({
     container: host,
     src: resolveAbsoluteSrc(item),
     sourceName: item.name,
+    initialTool: _editorIsAnim ? 'slice' : undefined,
+    initialSliceMode: _editorIsAnim ? 'anim' : undefined,
+    initialSliceParams: (_editorIsAnim && _editorFrameCount) ? { cols: _editorFrameCount, rows: 1 } : undefined,
     onApply: async (out) => {
       try {
         if (!repoPath) {
