@@ -278,8 +278,8 @@
   .sliced-thumb:hover { transform: scale(1.08); border-color: #5A3C1E; }
   .sliced-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
 </style>
-<link rel="stylesheet" href="lib/image-editor.css?v=15">
-<script src="lib/image-editor.js?v=15"></script>
+<link rel="stylesheet" href="lib/image-editor.css?v=16">
+<script src="lib/image-editor.js?v=16"></script>
 <script src="lib/video-to-strip.js?v=1"></script>
 <!-- Firebase JS SDK (client) — public read only, no auth required -->
 <script type="module">
@@ -1425,7 +1425,7 @@ function openEditor(id) {
         if (prevLO) URL.revokeObjectURL(prevLO);
         localOverrides.set(item.id, objectURL);
         await idbSaveOverride(item.id, payload.stripBlob, animMeta);
-        refreshLocalView(item.id, payload.stripBlob);
+        refreshLocalView(item.id, payload.stripBlob, animMeta);
         closeEditor();
         toast('Publishing...', 'ok');
         const pngBase64 = await blobToBase64(payload.stripBlob);
@@ -1452,19 +1452,40 @@ function openEditor(id) {
     onCancel: () => closeEditor()
   });
 }
-function refreshLocalView(assetId, blob) {
+function refreshLocalView(assetId, blob, animMeta) {
   // Revoke old objectURL if any
   const prev = localOverrides.get(assetId);
   if (prev) URL.revokeObjectURL(prev);
   const url = URL.createObjectURL(blob);
   localOverrides.set(assetId, url);
+  // Patch in-memory item so next openEditor uses new frame count
+  const memItem = (typeof data !== 'undefined' && data.items)
+    ? data.items.find(x => x.id === assetId) : null;
+  if (memItem && animMeta) memItem.animation = { ...(memItem.animation || {}), ...animMeta };
+  // Recompute anim display params if animMeta provided
+  const frames = animMeta?.frames || 1;
+  const frameW = animMeta?.frameW || null;
   // Update card thumbnail
   const card = document.querySelector(`.card[data-id="${assetId}"]`);
   if (card) {
     const img = card.querySelector('.thumb img');
     if (img) img.src = url;
     const anim = card.querySelector('.anim-frame');
-    if (anim) anim.style.backgroundImage = `url('${url}')`;
+    if (anim) {
+      anim.style.backgroundImage = `url('${url}')`;
+      if (frames > 1 && frameW) {
+        const dispH = 128;
+        const dispW = Math.round(frameW * (dispH / (animMeta.frameH || frameW)));
+        const endX = -((frames - 1) * dispW);
+        const dur = (frames / (animMeta.fps || 8)).toFixed(2);
+        anim.style.width = dispW + 'px';
+        anim.style.height = dispH + 'px';
+        anim.style.backgroundSize = `${dispW * frames}px ${dispH}px`;
+        anim.style.setProperty('--end', endX + 'px');
+        anim.style.animationDuration = dur + 's';
+        anim.style.animationTimingFunction = `steps(${frames - 1})`;
+      }
+    }
   }
   // Update modal preview if open for this asset
   const modalBox = document.getElementById('box');
