@@ -1202,7 +1202,35 @@ async function clearEntry(name) {
 }
 
 async function deleteUpload(name) {
-  if (!confirm(`${name} upload'unu silmek istediğine emin misin?`)) return;
+  const prev = missing.items.find(i => i.name === name);
+  const tileEl = document.getElementById('miss-' + CSS.escape(name));
+  if (tileEl) tileEl.style.opacity = '0.3';
+  let restored = false;
+  toast('🗑 Upload silindi', 'ok', {
+    undoLabel: '↺ Geri al',
+    undoMs: 5000,
+    onUndo: async () => {
+      restored = true;
+      if (tileEl) tileEl.style.opacity = '';
+      if (prev?.uploadedFile) {
+        try {
+          const r = await fetch('/api/trash', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'restore', file: prev.uploadedFile }),
+          });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error);
+          await fetch('/api/missing-patch', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: prev.name, patch: { status: prev.status || 'waiting-for-review', uploadedFile: prev.uploadedFile, denyReason: prev.denyReason || null } }),
+          }).catch(() => {});
+          toast('Geri alindi');
+        } catch (e) { toast('Geri alma basarisiz: ' + e.message, 'err'); }
+      }
+      setTimeout(load, 500);
+    },
+  });
   try {
     const r = await fetch('/api/delete', {
       method: 'POST',
@@ -1211,11 +1239,14 @@ async function deleteUpload(name) {
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'delete failed');
-    const prev = missing.items.find(i => i.name === name);
     if (prev?.uploadedFile) recordAction({ type: 'upload-delete', file: prev.uploadedFile, itemName: prev.name, prevStatus: prev.status, prevDenyReason: prev.denyReason, label: 'silme' });
-    toast('Silindi');
-    setTimeout(load, 800);
-  } catch (e) { toast(String(e.message), 'err'); }
+    if (tileEl) tileEl.remove();
+  } catch (e) {
+    if (!restored) {
+      if (tileEl) tileEl.style.opacity = '';
+      toast(String(e.message), 'err');
+    }
+  }
 }
 
 function fmtSize(b) {
