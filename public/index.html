@@ -278,8 +278,8 @@
   .sliced-thumb:hover { transform: scale(1.08); border-color: #5A3C1E; }
   .sliced-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
 </style>
-<link rel="stylesheet" href="lib/image-editor.css?v=17">
-<script src="lib/image-editor.js?v=17"></script>
+<link rel="stylesheet" href="lib/image-editor.css?v=18">
+<script src="lib/image-editor.js?v=18"></script>
 <script src="lib/video-to-strip.js?v=1"></script>
 <!-- Firebase JS SDK (client) — public read only, no auth required -->
 <script type="module">
@@ -384,6 +384,7 @@ let missing = { items: [] };
 let review = { items: [] };
 let config = null;
 let lastAction = null; // for undo
+let _publishInFlight = 0;
 
 // Map<assetId, objectURL> — populated from IndexedDB on load, updated on publish
 const localOverrides = new Map();
@@ -532,6 +533,7 @@ function syncUrlParams() {
   const p = new URLSearchParams();
   if (filter.q) p.set('q', filter.q);
   if (filter.cat) p.set('cat', filter.cat);
+  if (filter.ext) p.set('ext', filter.ext);
   if (filter.type) p.set('type', filter.type);
   if (tab && tab !== 'have') p.set('tab', tab);
   // preserve ?asset= if modal is open
@@ -542,8 +544,9 @@ function syncUrlParams() {
 }
 function restoreStateFromUrl() {
   const p = new URLSearchParams(location.search);
-  if (p.get('q')) { filter.q = p.get('q'); document.getElementById('q').value = filter.q; }
+  if (p.get('q')) { filter.q = decodeURIComponent(p.get('q')); document.getElementById('q').value = filter.q; }
   if (p.get('cat')) { filter.cat = p.get('cat'); document.getElementById('cat').value = filter.cat; }
+  if (p.get('ext')) { filter.ext = p.get('ext'); document.getElementById('ext').value = filter.ext; }
   if (p.get('type')) { filter.type = p.get('type'); document.getElementById('type').value = filter.type; }
   if (p.get('tab') && p.get('tab') !== 'have') {
     const btn = document.querySelector(`.tab[data-tab="${p.get('tab')}"]`);
@@ -1474,6 +1477,8 @@ function openEditor(id) {
   const item = (data.items || []).find(x => x.id === id);
   if (!item) { toast('Asset not found: ' + id, 'err'); return; }
   const repoPath = resolveRepoPath(item);
+  // Destroy previous editor instance before wiping DOM (prevents listener leaks)
+  if (activeEditor && activeEditor.destroy) { activeEditor.destroy(); activeEditor = null; }
   const modal = document.getElementById('editor-modal');
   modal.innerHTML = '';
   modal.classList.add('open');
@@ -1494,33 +1499,49 @@ function openEditor(id) {
     initialSliceMode: _editorIsAnim ? 'anim' : undefined,
     initialSliceParams: (_editorIsAnim && _editorFrameCount) ? { cols: _editorFrameCount, rows: 1 } : undefined,
     onApply: async (out) => {
+      _publishInFlight++;
       try {
         if (!out || !out.pngBlob) { toast('Editor produced no PNG output.', 'err'); return; }
-        // Optimistic local update
+        toast(`Publishing${_publishInFlight > 1 ? ` (${_publishInFlight})` : ''}...`, 'ok');
+        const pngBase64 = await blobToBase64(out.pngBlob);
+        let res;
+        try {
+          res = await fetch('/api/save-edits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assetPath: repoPath, pngBase64 }),
+          });
+        } catch (fetchErr) {
+          toast('Publish failed (network): ' + fetchErr.message, 'err');
+          return;
+        }
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          toast('Publish failed (' + res.status + '): ' + (j.error || 'unknown'), 'err');
+          return;
+        }
+        // Local update only AFTER successful publish
         const objectURL = URL.createObjectURL(out.pngBlob);
         const prevLO = localOverrides.get(item.id);
         if (prevLO) URL.revokeObjectURL(prevLO);
         localOverrides.set(item.id, objectURL);
         await idbSaveOverride(item.id, out.pngBlob, null);
         refreshLocalView(item.id, out.pngBlob);
-        toast('Publishing...', 'ok');
-        const pngBase64 = await blobToBase64(out.pngBlob);
-        const res = await fetch('/api/save-edits', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assetPath: repoPath, pngBase64 }),
-        });
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}));
-          throw new Error(j.error || res.status);
-        }
+        try {
+          const ch = new BroadcastChannel('gpc-asset-browser');
+          ch.postMessage({ type: 'asset-updated', assetId: item.id, ts: Date.now() });
+          ch.close();
+        } catch(_) {}
         toast('Published', 'ok');
         if (window._DEPLOY_HOOK_URL) fetch(window._DEPLOY_HOOK_URL, { method: 'POST' }).catch(() => {});
       } catch (e) {
         toast('Publish failed: ' + (e.message || e), 'err');
+      } finally {
+        _publishInFlight--;
       }
     },
     onSliceApply: async (payload) => {
+      _publishInFlight++;
       try {
         if (!payload.stripBlob) { toast('No strip output from slicer.', 'err'); return; }
         const animMeta = {
@@ -1531,30 +1552,118 @@ function openEditor(id) {
           layout: 'horizontal-strip',
           customCells: payload.params?._cells || null
         };
-        // Optimistic local update
+        toast(`Publishing${_publishInFlight > 1 ? ` (${_publishInFlight})` : ''}...`, 'ok');
+        const pngBase64 = await blobToBase64(payload.stripBlob);
+        let res;
+        try {
+          res = await fetch('/api/save-edits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assetPath: repoPath, pngBase64 }),
+          });
+        } catch (fetchErr) {
+          toast('Publish failed (network): ' + fetchErr.message, 'err');
+          return;
+        }
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          toast('Publish failed (' + res.status + '): ' + (j.error || 'unknown'), 'err');
+          return;
+        }
+        // Sequential: save anim-meta AFTER image publish succeeds
+        let animMetaError = null;
+        try {
+          const metaRes = await fetch('/api/save-animation-meta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assetId: item.id, animation: animMeta }),
+          });
+          if (!metaRes.ok) {
+            const m = await metaRes.json().catch(() => ({}));
+            animMetaError = new Error(m.error || metaRes.status);
+          }
+        } catch (metaErr) {
+          animMetaError = metaErr;
+        }
+        // Local update AFTER image publish (even if meta failed)
         const objectURL = URL.createObjectURL(payload.stripBlob);
         const prevLO = localOverrides.get(item.id);
         if (prevLO) URL.revokeObjectURL(prevLO);
         localOverrides.set(item.id, objectURL);
         await idbSaveOverride(item.id, payload.stripBlob, animMeta);
         refreshLocalView(item.id, payload.stripBlob, animMeta);
-        toast('Publishing...', 'ok');
-        const pngBase64 = await blobToBase64(payload.stripBlob);
-        const res = await fetch('/api/save-edits', {
+        try {
+          const ch = new BroadcastChannel('gpc-asset-browser');
+          ch.postMessage({ type: 'asset-updated', assetId: item.id, ts: Date.now() });
+          ch.close();
+        } catch(_) {}
+        if (animMetaError) {
+          toast('Published (anim-meta failed: ' + animMetaError.message + ')', 'err');
+        } else {
+          toast('Published', 'ok');
+        }
+        if (window._DEPLOY_HOOK_URL) fetch(window._DEPLOY_HOOK_URL, { method: 'POST' }).catch(() => {});
+      } catch (e) {
+        toast('Publish failed: ' + (e.message || e), 'err');
+      } finally {
+        _publishInFlight--;
+      }
+    },
+    onCancel: () => closeEditor()
+  });
+}
+
+// Opens the SOURCE SHEET in image-editor with initial crop bbox for this asset.
+// User drag/resizes the crop bbox; Apply re-crops and saves sourceBbox sidecar.
+async function openEditorFromSheet(id) {
+  const item = (data.items || []).find(x => x.id === id);
+  if (!item) { toast('Asset not found: ' + id, 'err'); return; }
+  const sheetInfo = sourceSheetOverrides[id];
+  if (!sheetInfo || !sheetInfo.sourceSheet) { toast('No sourceSheet for: ' + id, 'err'); return; }
+  const sheetRelPath = sheetInfo.sourceSheet;
+  const gameOrigin = 'https://golf-paper-craft.vercel.app';
+  const rawSheetUrl = gameOrigin + '/' + sheetRelPath;
+  const proxiedSheetUrl = '/api/proxy-image?url=' + encodeURIComponent(rawSheetUrl);
+  const savedBbox = sourceBboxStore[id] || null;
+  const repoPath = resolveRepoPath(item);
+  const modal = document.getElementById('editor-modal');
+  modal.innerHTML = '';
+  modal.classList.add('open');
+  const host = document.createElement('div');
+  host.className = 'editor-host';
+  modal.appendChild(host);
+  activeEditor = window.ImageEditor.mount({
+    container: host,
+    src: proxiedSheetUrl,
+    sourceName: sheetRelPath.split('/').pop(),
+    assetName: item.name,
+    initialTool: 'crop',
+    edits: savedBbox ? { crop: { x: savedBbox.x, y: savedBbox.y, w: savedBbox.w, h: savedBbox.h } } : {},
+    onApply: async (out) => {
+      try {
+        if (!out || !out.pngBlob) { toast('No PNG output from editor.', 'err'); return; }
+        const bbox = (out.edits && out.edits.crop && out.edits.crop.w > 0)
+          ? { x: Math.round(out.edits.crop.x), y: Math.round(out.edits.crop.y), w: Math.round(out.edits.crop.w), h: Math.round(out.edits.crop.h) }
+          : { x: 0, y: 0, w: out.width, h: out.height };
+        const objectURL = URL.createObjectURL(out.pngBlob);
+        const prevLO = localOverrides.get(item.id);
+        if (prevLO) URL.revokeObjectURL(prevLO);
+        localOverrides.set(item.id, objectURL);
+        await idbSaveOverride(item.id, out.pngBlob, null);
+        refreshLocalView(item.id, out.pngBlob);
+        toast('Publishing re-cropped asset...', 'ok');
+        const pngBase64 = await blobToBase64(out.pngBlob);
+        const res = await fetch('/api/save-source-bbox', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assetPath: repoPath, pngBase64 }),
+          body: JSON.stringify({ assetId: item.id, assetPath: repoPath, bbox, pngBase64 }),
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
           throw new Error(j.error || res.status);
         }
-        await fetch('/api/save-animation-meta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assetId: item.id, animation: animMeta }),
-        }).catch(() => {});
-        toast('Published', 'ok');
+        sourceBboxStore[item.id] = bbox;
+        toast('Published + bbox saved', 'ok');
         if (window._DEPLOY_HOOK_URL) fetch(window._DEPLOY_HOOK_URL, { method: 'POST' }).catch(() => {});
       } catch (e) {
         toast('Publish failed: ' + (e.message || e), 'err');
@@ -1563,6 +1672,7 @@ function openEditor(id) {
     onCancel: () => closeEditor()
   });
 }
+
 function refreshLocalView(assetId, blob, animMeta) {
   // Revoke old objectURL if any
   const prev = localOverrides.get(assetId);
@@ -1617,10 +1727,20 @@ function closeEditor() {
   if (activeEditor && activeEditor.destroy) { activeEditor.destroy(); activeEditor = null; }
 }
 
-document.getElementById('q').oninput = e => { filter.q = e.target.value; render(); syncUrlParams(); };
-document.getElementById('cat').onchange = e => { filter.cat = e.target.value; render(); syncUrlParams(); };
-document.getElementById('ext').onchange = e => { filter.ext = e.target.value; render(); };
-document.getElementById('type').onchange = e => { filter.type = e.target.value; render(); syncUrlParams(); };
+// --- debounced search + unified filter apply ---
+let _searchDebounceTimer = null;
+function applyFilter() {
+  render();
+  syncUrlParams();
+}
+document.getElementById('q').oninput = e => {
+  filter.q = e.target.value;
+  clearTimeout(_searchDebounceTimer);
+  _searchDebounceTimer = setTimeout(applyFilter, 200);
+};
+document.getElementById('cat').onchange = e => { filter.cat = e.target.value; applyFilter(); };
+document.getElementById('ext').onchange = e => { filter.ext = e.target.value; applyFilter(); };
+document.getElementById('type').onchange = e => { filter.type = e.target.value; applyFilter(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeEditor(); closeVideoEditor(); } });
 
 // ---- Video → Strip pipeline ----------------------------------------------
