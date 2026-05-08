@@ -1,23 +1,22 @@
-// GET /api/uploaded?file=xxx.png — proxy uploaded file from GitHub
-import { readConfig, gh } from './_config.js';
+// GET /api/uploaded?file=xxx.png — proxy uploaded file from gpc-asset-browser data/uploads/
+import { DATA_REPO, gh } from './_config.js';
+
+const UPLOADS_PATH = 'data/uploads';
 
 export default async function handler(req, res) {
   const token = process.env.GITHUB_TOKEN;
   if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN env var not set' });
-  const config = readConfig();
-  const branch = config.github?.branch || 'main';
-  const uploadPrefix = config.uploadPath || 'asset-browser/data/uploads';
   const file = (req.query?.file || new URL(req.url, 'http://x').searchParams.get('file') || '').replace(/[^A-Za-z0-9._-]/g, '');
   if (!file) return res.status(400).json({ error: 'file required' });
 
   try {
-    const meta = await gh(token, `${uploadPrefix}/${file}`, { ref: branch, github: config.github });
+    const meta = await gh(token, `${UPLOADS_PATH}/${file}`, { ref: DATA_REPO.branch, github: DATA_REPO });
     let buf;
     if (meta.content) {
       buf = Buffer.from(meta.content, 'base64');
     } else {
       // Large file: contents API returns empty content; fetch via blobs API
-      const blobUrl = `https://api.github.com/repos/${config.github.owner}/${config.github.repo}/git/blobs/${meta.sha}`;
+      const blobUrl = `https://api.github.com/repos/${DATA_REPO.owner}/${DATA_REPO.repo}/git/blobs/${meta.sha}`;
       const br = await fetch(blobUrl, {
         headers: {
           Authorization: `Bearer ${token}`,

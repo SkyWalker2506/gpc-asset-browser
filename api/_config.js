@@ -2,6 +2,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Data files (missing.json, review.json, trash/, uploads/) live in the
+// gpc-asset-browser submodule repo, NOT in the main golf-paper-craft repo.
+export const DATA_REPO = { owner: 'SkyWalker2506', repo: 'gpc-asset-browser', branch: 'main' };
+
 export function readConfig() {
   const p = path.resolve(process.cwd(), 'config.json');
   if (!fs.existsSync(p)) return {};

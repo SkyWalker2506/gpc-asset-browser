@@ -1,14 +1,14 @@
-import { readConfig, gh } from './_config.js';
+import { readConfig, DATA_REPO, gh } from './_config.js';
 import { moveToTrash } from './_trash-util.js';
+
+const MISSING_JSON_PATH = 'data/missing.json';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   const token = process.env.GITHUB_TOKEN;
   if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN env var not set' });
   const config = readConfig();
-  const branch = config.github.branch || 'main';
-  const uploadPrefix = config.uploadPath || 'asset-browser/data/uploads';
-  const missingJsonPath = `${config.dataPath || (uploadPrefix.split('/').slice(0, -1).join('/') || 'asset-browser/data')}/missing.json`;
+  const uploadPrefix = config.uploadPath || 'www/assets/sliced/uploads';
 
   try {
     let body = req.body;
@@ -16,40 +16,38 @@ export default async function handler(req, res) {
     const { name } = body;
     if (!name) return res.status(400).json({ error: 'name required' });
 
-    const miss = await gh(token, missingJsonPath, { ref: branch, github: config.github });
+    const miss = await gh(token, MISSING_JSON_PATH, { ref: DATA_REPO.branch, github: DATA_REPO });
     const json = JSON.parse(Buffer.from(miss.content, 'base64').toString());
     const item = json.items.find(i => i.name === name);
     if (!item) return res.status(404).json({ error: 'item not found' });
     if (!['waiting-for-review', 'denied', 'approved'].includes(item.status)) return res.status(400).json({ error: 'nothing to delete' });
 
-    // Move upload file to trash
+    // Move upload file to trash (upload lives in gpc-asset-browser data/uploads/)
     if (item.uploadedFile) {
-      const filePath = `${uploadPrefix}/${item.uploadedFile}`;
-      try { await moveToTrash(token, config, branch, filePath, uploadPrefix, `delete ${item.status}`); } catch {}
+      const filePath = `data/uploads/${item.uploadedFile}`;
+      try { await moveToTrash(token, config, DATA_REPO.branch, filePath, 'data/uploads', `delete ${item.status}`); } catch {}
     }
 
-    // Move runtime asset to trash too. Use explicit item.runtimeDir; fall back
-    // to the canonical uploadPrefix dropbox. Never regex-match config.sources —
-    // that bug routed non-ball assets into www/assets/sliced/balls/.
+    // Move runtime asset to trash (runtime lives in golf-paper-craft www/assets/...)
     const runtimeDir = (typeof item.runtimeDir === 'string' && item.runtimeDir.trim())
       ? item.runtimeDir.trim().replace(/^\/+|\/+$/g, '')
       : uploadPrefix;
     if (runtimeDir) {
       for (const ext of ['webp', 'png', 'gif', 'jpg']) {
         const rp = `${runtimeDir}/${item.name}.${ext}`;
-        try { await moveToTrash(token, config, branch, rp, runtimeDir, `delete ${item.status}`); } catch {}
+        try { await moveToTrash(token, config, DATA_REPO.branch, rp, runtimeDir, `delete ${item.status}`); } catch {}
       }
     }
 
     item.status = 'todo';
     delete item.uploadedFile;
     json.updated = new Date().toISOString().slice(0, 10);
-    await gh(token, missingJsonPath, {
-      method: 'PUT', github: config.github,
+    await gh(token, MISSING_JSON_PATH, {
+      method: 'PUT', github: DATA_REPO,
       body: {
         message: `missing: ${name} -> todo`,
         content: Buffer.from(JSON.stringify(json, null, 2)).toString('base64'),
-        sha: miss.sha, branch,
+        sha: miss.sha, branch: DATA_REPO.branch,
       },
     });
 

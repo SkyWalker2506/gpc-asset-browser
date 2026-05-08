@@ -3,16 +3,15 @@
 // POST /api/review-flag { file, remove: true }         — unflag asset
 import { readConfig, gh } from './_config.js';
 
+const DATA_REPO = { owner: 'SkyWalker2506', repo: 'gpc-asset-browser', branch: 'main' };
+const REVIEW_JSON_PATH = 'data/review.json';
+
 export default async function handler(req, res) {
   const token = process.env.GITHUB_TOKEN;
   if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN env var not set' });
-  const config = readConfig();
-  const branch = config.github?.branch || 'main';
-  const uploadPrefix = config.uploadPath || 'asset-browser/data/uploads';
-  const reviewJsonPath = `${config.dataPath || (uploadPrefix.split('/').slice(0, -1).join('/') || 'asset-browser/data')}/review.json`;
 
   try {
-    const cur = await gh(token, reviewJsonPath, { ref: branch, github: config.github });
+    const cur = await gh(token, REVIEW_JSON_PATH, { ref: DATA_REPO.branch, github: DATA_REPO });
     const json = JSON.parse(Buffer.from(cur.content, 'base64').toString());
 
     if (req.method === 'GET') {
@@ -41,12 +40,12 @@ export default async function handler(req, res) {
     }
     json.updated = new Date().toISOString().slice(0, 10);
 
-    await gh(token, reviewJsonPath, {
-      method: 'PUT', github: config.github,
+    await gh(token, REVIEW_JSON_PATH, {
+      method: 'PUT', github: DATA_REPO,
       body: {
         message: remove ? `review: unflag ${file}` : `review: flag ${file}`,
         content: Buffer.from(JSON.stringify(json, null, 2)).toString('base64'),
-        sha: cur.sha, branch,
+        sha: cur.sha, branch: DATA_REPO.branch,
       },
     });
 

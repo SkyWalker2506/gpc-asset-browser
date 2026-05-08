@@ -1,6 +1,6 @@
 // GET /api/trash — list trash files (admin only)
 // POST /api/trash { action: 'restore'|'purge', file } — restore to runtime or hard-delete
-import { readConfig, gh } from './_config.js';
+import { readConfig, DATA_REPO, gh } from './_config.js';
 
 function isAdmin(req) {
   const token = process.env.ADMIN_TOKEN;
@@ -10,25 +10,23 @@ function isAdmin(req) {
   return h === token || q === token;
 }
 
+const TRASH_DIR = 'data/trash';
+
 export default async function handler(req, res) {
   const token = process.env.GITHUB_TOKEN;
   if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN env var not set' });
-  // GET (list) + POST restore are public. POST purge is admin-only.
   let body = req.body;
   if (typeof body === 'string') try { body = JSON.parse(body); } catch { body = {}; }
   const isPurge = req.method === 'POST' && body?.action === 'purge';
   if (isPurge && !isAdmin(req)) return res.status(403).json({ error: 'purge admin only' });
 
   const config = readConfig();
-  const branch = config.github.branch || 'main';
-  const uploadPrefix = config.uploadPath || 'asset-browser/data/uploads';
-  const trashDir = config.trashPath || `${uploadPrefix.split('/').slice(0, -1).join('/')}/trash`;
 
   try {
     if (req.method === 'GET') {
       let files = [];
       try {
-        const list = await gh(token, trashDir, { ref: branch, github: config.github });
+        const list = await gh(token, TRASH_DIR, { ref: DATA_REPO.branch, github: DATA_REPO });
         files = (Array.isArray(list) ? list : []).map(f => ({
           name: f.name,
           size: f.size,
@@ -45,52 +43,56 @@ export default async function handler(req, res) {
       if (!file) return res.status(400).json({ error: 'file required' });
 
       if (action === 'purge') {
-        const path = `${trashDir}/${file}`;
-        const meta = await gh(token, path, { ref: branch, github: config.github });
-        await gh(token, path, { method: 'DELETE', github: config.github, body: { message: `trash purge: ${file}`, sha: meta.sha, branch } });
+        const path = `${TRASH_DIR}/${file}`;
+        const meta = await gh(token, path, { ref: DATA_REPO.branch, github: DATA_REPO });
+        await gh(token, path, { method: 'DELETE', github: DATA_REPO, body: { message: `trash purge: ${file}`, sha: meta.sha, branch: DATA_REPO.branch } });
         return res.json({ ok: true });
       }
 
       if (action === 'restore') {
         // Read meta json to know where it came from
-        const metaPath = `${trashDir}/${file.replace(/\.[^.]+$/, '')}.meta.json`;
-        let originDir, deletedAt;
+        const metaPath = `${TRASH_DIR}/${file.replace(/\.[^.]+$/, '')}.meta.json`;
+        let originDir, originRepoName;
         try {
-          const mr = await gh(token, metaPath, { ref: branch, github: config.github });
+          const mr = await gh(token, metaPath, { ref: DATA_REPO.branch, github: DATA_REPO });
           const metaObj = JSON.parse(Buffer.from(mr.content, 'base64').toString());
           originDir = metaObj.originDir;
-          deletedAt = metaObj.deletedAt;
+          originRepoName = metaObj.originRepo;
         } catch {
           originDir = (config.sources || [])[0]?.dir;
         }
-        // Restore is public — no time limit
         if (!originDir) return res.status(400).json({ error: 'origin unknown' });
 
-        // Read trash file content
-        const trashPath = `${trashDir}/${file}`;
-        const trashMeta = await gh(token, trashPath, { ref: branch, github: config.github });
+        // Determine which repo to restore to based on origin path
+        const isRuntimeFile = originDir.startsWith('www/') || originDir.startsWith('/www/');
+        const restoreRepo = (isRuntimeFile || originRepoName === 'golf-paper-craft') ? config.github : DATA_REPO;
+        const restoreBranch = restoreRepo.branch || 'main';
+
+        // Read trash file content from gpc-asset-browser
+        const trashPath = `${TRASH_DIR}/${file}`;
+        const trashMeta = await gh(token, trashPath, { ref: DATA_REPO.branch, github: DATA_REPO });
         let content = trashMeta.content;
         if (!content) {
-          const blob = await fetch(`https://api.github.com/repos/${config.github.owner}/${config.github.repo}/git/blobs/${trashMeta.sha}`, {
+          const blob = await fetch(`https://api.github.com/repos/${DATA_REPO.owner}/${DATA_REPO.repo}/git/blobs/${trashMeta.sha}`, {
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
           }).then(r => r.json());
           content = blob.content;
         }
 
-        // PUT to runtime
+        // PUT to target repo
         const restorePath = `${originDir}/${file}`;
         let existingSha;
-        try { existingSha = (await gh(token, restorePath, { ref: branch, github: config.github })).sha; } catch {}
+        try { existingSha = (await gh(token, restorePath, { ref: restoreBranch, github: restoreRepo })).sha; } catch {}
         await gh(token, restorePath, {
-          method: 'PUT', github: config.github,
-          body: { message: `restore: ${file}`, content, branch, ...(existingSha ? { sha: existingSha } : {}) },
+          method: 'PUT', github: restoreRepo,
+          body: { message: `restore: ${file}`, content, branch: restoreBranch, ...(existingSha ? { sha: existingSha } : {}) },
         });
 
-        // Delete trash + meta
-        await gh(token, trashPath, { method: 'DELETE', github: config.github, body: { message: `trash remove after restore`, sha: trashMeta.sha, branch } });
+        // Delete trash + meta from gpc-asset-browser
+        await gh(token, trashPath, { method: 'DELETE', github: DATA_REPO, body: { message: `trash remove after restore`, sha: trashMeta.sha, branch: DATA_REPO.branch } });
         try {
-          const m2 = await gh(token, metaPath, { ref: branch, github: config.github });
-          await gh(token, metaPath, { method: 'DELETE', github: config.github, body: { message: `trash meta cleanup`, sha: m2.sha, branch } });
+          const m2 = await gh(token, metaPath, { ref: DATA_REPO.branch, github: DATA_REPO });
+          await gh(token, metaPath, { method: 'DELETE', github: DATA_REPO, body: { message: `trash meta cleanup`, sha: m2.sha, branch: DATA_REPO.branch } });
         } catch {}
         return res.json({ ok: true, restored: restorePath });
       }
