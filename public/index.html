@@ -595,10 +595,7 @@ async function load() {
   await idbClearStaleOverrides(data.items || []);
   updateTabVisibility();
   // probe trash count (public endpoint)
-  fetch('/api/trash').then(x => x.json()).then(t => {
-    const count = (t.files || []).filter(f => !f.name.endsWith('.meta.json')).length;
-    document.getElementById('trash-tab').style.display = count ? '' : 'none';
-  }).catch(() => {});
+  refreshTrashTabCount();
   buildCatSelect();
   // Restore filter + tab state from URL params BEFORE first render so chips activate correctly
   restoreStateFromUrl();
@@ -804,7 +801,7 @@ function render() {
     // Animation playback: if strip with N frames (dim like "WxH" where W = H*N)
     if (i.type === 'Animasyon' && i.dim) {
       const m = i.dim.match(/^(\d+)x(\d+)$/);
-      const nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
+      const nameFrames = ((i.file || i.name).match(/[-_](\d+)f/i) || [])[1];
       if (m) {
         const w = +m[1], h = +m[2];
         const frames = nameFrames ? +nameFrames : (w > h ? Math.round(w / h) : 1);
@@ -813,7 +810,8 @@ function render() {
           const frameW = w / frames;
           const dispH = 128, dispW = Math.min(128, Math.round(frameW * (dispH / h)));
           const endX = -((frames - 1) * dispW);
-          const dur = (frames / 8).toFixed(2);
+          const _tileFps = (i.animation && i.animation.fps) ? i.animation.fps : 8;
+          const dur = (frames / _tileFps).toFixed(2);
           thumbInner = `<div class="anim-frame" style="width:${dispW}px;height:${dispH}px;background-image:url('${_abs}');background-size:${dispW * frames}px ${dispH}px;--end:${endX}px;animation:sprite-play ${dur}s steps(${frames - 1}) infinite;"></div>`;
         }
       }
@@ -883,8 +881,8 @@ function toast(msg, kind = 'ok', { undoLabel, onUndo, undoMs = 5000 } = {}) {
     let done = false;
     const interval = setInterval(() => {
       secsLeft--;
-      if (secsLeft > 0) btn.textContent = undoLabel + ' (' + secsLeft + ')';
-      else { clearInterval(interval); }
+      btn.textContent = secsLeft > 0 ? undoLabel + ' (' + secsLeft + ')' : undoLabel;
+      if (secsLeft <= 0) clearInterval(interval);
     }, 1000);
     btn.onclick = (e) => {
       e.stopPropagation();
@@ -1024,34 +1022,15 @@ function customConfirm(msg) {
 
 async function deleteAsset(file, dir, andUnflag) {
   if (!dir) return toast('Bu asset silinemez (dir yok)', 'err');
-  // Find and immediately hide the tile
+  // Find and immediately dim the tile
   const assetId = (data.items || []).find(i => i.file === file)?.id;
   let tileEl = null;
   if (assetId) {
     tileEl = document.querySelector(`.card[data-id="${assetId}"]`);
     if (tileEl) tileEl.style.opacity = '0.3';
   }
-  let restored = false;
-  toast('🗑 Trash\'e taşındı', 'ok', {
-    undoLabel: '↺ Geri al',
-    undoMs: 5000,
-    onUndo: async () => {
-      restored = true;
-      if (tileEl) tileEl.style.opacity = '';
-      try {
-        const r = await fetch('/api/trash', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'restore', file }),
-        });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error);
-        toast('Geri alındı');
-        setTimeout(load, 500);
-      } catch (e) { toast('Geri alma başarısız: ' + e.message, 'err'); setTimeout(load, 500); }
-    },
-  });
   try {
+    // DELETE first — toast shown after so restore is always safe
     const r = await fetch('/api/asset-delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1068,12 +1047,41 @@ async function deleteAsset(file, dir, andUnflag) {
       }).catch(() => {});
     }
     if (tileEl) tileEl.remove();
+    refreshTrashTabCount();
+    // Toast with undo shown AFTER delete succeeds — file is now in trash
+    toast('🗑 Trash\'e taşındı', 'ok', {
+      undoLabel: '↺ Geri al',
+      undoMs: 5000,
+      onUndo: async () => {
+        try {
+          const r2 = await fetch('/api/trash', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'restore', file }),
+          });
+          const j2 = await r2.json();
+          if (!r2.ok) throw new Error(j2.error);
+          toast('Geri alındı');
+          refreshTrashTabCount();
+          setTimeout(load, 500);
+        } catch (e) { toast('Geri alma başarısız: ' + e.message, 'err'); setTimeout(load, 500); }
+      },
+    });
   } catch (e) {
-    if (!restored) {
-      if (tileEl) tileEl.style.opacity = '';
-      toast(String(e.message), 'err');
-    }
+    if (tileEl) tileEl.style.opacity = '';
+    toast(String(e.message), 'err');
   }
+}
+
+function refreshTrashTabCount() {
+  fetch('/api/trash').then(x => x.json()).then(t => {
+    const count = (t.files || []).filter(f => !f.name.endsWith('.meta.json')).length;
+    const tab = document.getElementById('trash-tab');
+    if (tab) {
+      tab.textContent = count ? `Çöp (${count})` : 'Çöp';
+      tab.style.display = count ? '' : 'none';
+    }
+  }).catch(() => {});
 }
 
 function recordAction(action) {
@@ -1291,17 +1299,18 @@ function openModal(id) {
   let previewInner = `<img src="${_absSrc}">`;
   if (i.type === 'Animasyon' && i.dim) {
     const m = i.dim.match(/^(\d+)x(\d+)$/);
-    const nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
+    const nameFrames = ((i.file || i.name).match(/[-_](\d+)f/i) || [])[1];
     if (m) {
       const w = +m[1], h = +m[2];
       const frames = nameFrames ? +nameFrames : (w > h ? Math.round(w / h) : 1);
       if (frames > 1) {
         const frameW = w / frames;
         const dispH = 256, dispW = Math.round(frameW * (dispH / h));
-        const endX = -((frames - 1) * dispW), dur = (frames / 8).toFixed(2);
+        const _previewFps = (i.animation && i.animation.fps) ? i.animation.fps : 8;
+        const endX = -((frames - 1) * dispW), dur = (frames / _previewFps).toFixed(2);
         previewInner = `
           <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
-            <div style="font-size:11px;color:#5A3C1E;font-weight:600;">Oyun içi görünüm (${frames} frame @ 8 FPS)</div>
+            <div style="font-size:11px;color:#5A3C1E;font-weight:600;">Oyun içi görünüm (${frames} frame @ ${_previewFps} FPS)</div>
             <div style="width:${dispW}px;height:${dispH}px;background-image:url('${_absSrc}');background-repeat:no-repeat;background-size:${dispW * frames}px ${dispH}px;animation:sprite-play ${dur}s steps(${frames-1}) infinite;--end:${endX}px;image-rendering:-webkit-optimize-contrast;"></div>
             <div style="font-size:11px;color:#8b6b3d;">Ham strip:</div>
             <img src="${_absSrc}" style="max-width:100%;">
@@ -1311,7 +1320,7 @@ function openModal(id) {
   }
 
   // Compute animation defaults for the ANIMATION section.
-  const _nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
+  const _nameFrames = ((i.file || i.name).match(/[-_](\d+)f/i) || [])[1];
   const _dimMatch = (i.dim || '').match(/^(\d+)x(\d+)$/);
   const _isAnimType = i.type === 'Animasyon';
   const _isAnim = !!(_isAnimType || i.animation || _nameFrames);
@@ -1350,7 +1359,7 @@ function openModal(id) {
           <button id="ab-autodetect" style="padding:5px 10px;font-size:12px;border:1px solid #c9a87c;border-radius:4px;background:#FFF9E8;color:#5A3C1E;cursor:pointer;">Auto-detect frames</button>
           <button id="ab-save-anim" style="padding:5px 12px;font-size:12px;border:none;border-radius:4px;background:#3a7d44;color:#fff;cursor:pointer;font-weight:600;">Save animation metadata</button>
         </div>
-        ${_savedAnim.frames ? `<div style="font-size:11px;color:#3a7d44;margin-top:4px;">Saved: ${_savedAnim.frames}f @ ${_savedAnim.fps}fps (${_savedAnim.layout})</div>` : ''}
+        ${_savedAnim.frames ? `<div data-anim-saved="1" style="font-size:11px;color:#3a7d44;margin-top:4px;">Saved: ${_savedAnim.frames}f @ ${_savedAnim.fps}fps (${_savedAnim.layout})</div>` : ''}
       </div>
     </div>`;
 
@@ -1393,7 +1402,7 @@ function openModal(id) {
 
   document.getElementById('ab-autodetect').addEventListener('click', () => {
     // Try to detect from filename first, then image dimensions.
-    const fromName = (i.name.match(/[-_](\d+)f/i) || [])[1];
+    const fromName = ((i.file || i.name).match(/[-_](\d+)f/i) || [])[1];
     if (fromName) {
       document.getElementById('ab-frames').value = +fromName;
       toast('Detected ' + fromName + ' frames from filename');
@@ -1439,6 +1448,21 @@ function openModal(id) {
       // Update local data so re-opens show saved values.
       const localItem = data.items.find(x => x.id === i.id);
       if (localItem) localItem.animation = { frames, fps, layout };
+      // Refresh the saved-indicator line inside the open modal.
+      const _savedLine = document.querySelector('#ab-anim-fields [data-anim-saved]');
+      if (_savedLine) {
+        _savedLine.textContent = 'Saved: ' + frames + 'f @ ' + fps + 'fps (' + layout + ')';
+        _savedLine.style.display = '';
+      } else {
+        const _animFieldsEl = document.getElementById('ab-anim-fields');
+        if (_animFieldsEl) {
+          const _sl = document.createElement('div');
+          _sl.setAttribute('data-anim-saved', '1');
+          _sl.style.cssText = 'font-size:11px;color:#3a7d44;margin-top:4px;';
+          _sl.textContent = 'Saved: ' + frames + 'f @ ' + fps + 'fps (' + layout + ')';
+          _animFieldsEl.appendChild(_sl);
+        }
+      }
     } catch (e) { toast('Error: ' + (e.message || e), 'err'); }
   });
 }
@@ -1490,7 +1514,7 @@ function openEditor(id) {
   host.className = 'editor-host';
   modal.appendChild(host);
   // Detect animation strip to set initial slice mode.
-  const _editorNameFrames = (item.name.match(/[-_](\d+)f/i) || [])[1];
+  const _editorNameFrames = ((item.file || item.name).match(/[-_](\d+)f/i) || [])[1];
   const _editorIsAnim = !!(item.type === 'Animasyon' || item.animation || _editorNameFrames);
   const _editorFrameCount = item.animation?.frames || (_editorNameFrames ? +_editorNameFrames : null);
 
