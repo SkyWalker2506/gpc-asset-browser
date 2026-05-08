@@ -776,7 +776,7 @@ function render() {
     // Animation playback: if strip with N frames (dim like "WxH" where W = H*N)
     if (i.type === 'Animasyon' && i.dim) {
       const m = i.dim.match(/^(\d+)x(\d+)$/);
-      const nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
+      const nameFrames = ((i.file || i.name).match(/[-_](\d+)f/i) || [])[1];
       if (m) {
         const w = +m[1], h = +m[2];
         const frames = nameFrames ? +nameFrames : (w > h ? Math.round(w / h) : 1);
@@ -785,7 +785,8 @@ function render() {
           const frameW = w / frames;
           const dispH = 128, dispW = Math.min(128, Math.round(frameW * (dispH / h)));
           const endX = -((frames - 1) * dispW);
-          const dur = (frames / 8).toFixed(2);
+          const _tileFps = (i.animation && i.animation.fps) ? i.animation.fps : 8;
+          const dur = (frames / _tileFps).toFixed(2);
           thumbInner = `<div class="anim-frame" style="width:${dispW}px;height:${dispH}px;background-image:url('${_abs}');background-size:${dispW * frames}px ${dispH}px;--end:${endX}px;animation:sprite-play ${dur}s steps(${frames - 1}) infinite;"></div>`;
         }
       }
@@ -1282,7 +1283,7 @@ function openModal(id) {
   }
 
   // Compute animation defaults for the ANIMATION section.
-  const _nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
+  const _nameFrames = ((i.file || i.name).match(/[-_](\d+)f/i) || [])[1];
   const _dimMatch = (i.dim || '').match(/^(\d+)x(\d+)$/);
   const _isAnimType = i.type === 'Animasyon';
   const _isAnim = !!(_isAnimType || i.animation || _nameFrames);
@@ -1346,6 +1347,25 @@ function openModal(id) {
     editBtn.style.cssText = 'margin-top:12px;width:100%;padding:9px;border-radius:8px;border:2px solid #5A3C1E;background:linear-gradient(180deg,#E8A040 0%,#D08020 100%);color:#1a1510;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;';
     editBtn.onclick = function() { closeModal(); openEditor(i.id); };
     if (detailsEl) detailsEl.appendChild(editBtn);
+  }
+
+  // "From sheet" button — only shown when asset has a sourceSheet mapping
+  const _sheetOverride = sourceSheetOverrides[i.id];
+  if (!i.isSheet && _sheetOverride && _sheetOverride.sourceSheet) {
+    const _det = document.getElementById('box').querySelector('.details');
+    const _wrap = document.createElement('div');
+    _wrap.style.cssText = 'margin-top:10px;border-top:1px dashed rgba(139,88,71,0.3);padding-top:10px;';
+    const _lbl = document.createElement('div');
+    _lbl.style.cssText = 'font-size:11px;color:#8B5847;font-weight:600;margin-bottom:6px;';
+    _lbl.textContent = 'Source sheet: ' + _sheetOverride.sourceSheet.split('/').pop();
+    const _btn = document.createElement('button');
+    _btn.id = 'ab-from-sheet-btn';
+    _btn.textContent = '🗂 From sheet';
+    _btn.style.cssText = 'width:100%;padding:9px;border-radius:8px;border:2px solid #3060A0;background:linear-gradient(180deg,#4080D0 0%,#2860B0 100%);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;';
+    _btn.onclick = function() { closeModal(); openEditorFromSheet(i.id); };
+    _wrap.appendChild(_lbl);
+    _wrap.appendChild(_btn);
+    if (_det) _det.appendChild(_wrap);
   }
 
   document.getElementById('modal').classList.add('open');
