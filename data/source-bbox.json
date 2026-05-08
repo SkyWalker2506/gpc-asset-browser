@@ -1,3 +1,9 @@
 {
-  "_comment": "source bbox overrides per asset id: { x, y, w, h } in source sheet pixels"
+  "_comment": "source bbox overrides per asset id: { x, y, w, h } in source sheet pixels",
+  "sliced-balls-ball-0": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 64
+  }
 }
