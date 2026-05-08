@@ -1,6 +1,7 @@
 // POST /api/save-edits { assetPath, pngBase64 }      — overwrite a source PNG (was save-edits.js)
 // POST /api/save-edits { assetId, animation }        — save animation meta (was save-animation-meta.js)
 import { readConfig, gh } from './_config.js';
+import { supabaseUpsertManifest, supabaseUpsertAnimation } from './_supabase.js';
 
 // ---- save-animation-meta logic ----
 const SIDECAR_PATH = 'data/animation-meta.json';
@@ -37,7 +38,16 @@ async function handleAnimMeta(token, body, res) {
   if (process.env.FIREBASE_PROJECT_ID) {
     try {
       await saveAnimMetaToFirestore(assetId, newAnim);
-      return res.json({ ok: true, animation: newAnim, backend: 'firestore' });
+      // Dual-write to Supabase (non-fatal)
+      let supabaseResult = null;
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          supabaseResult = await supabaseUpsertAnimation(assetId, newAnim);
+        } catch (spErr) {
+          console.warn('Supabase animation upsert failed (non-fatal):', spErr.message);
+        }
+      }
+      return res.json({ ok: true, animation: newAnim, backend: 'firestore', supabase: supabaseResult ? 'ok' : 'skipped' });
     } catch (fbErr) {
       console.error('Firestore save failed, falling back to GitHub sidecar:', fbErr);
     }
@@ -64,7 +74,16 @@ async function handleAnimMeta(token, body, res) {
   };
   if (existingSha) putBody.sha = existingSha;
   const result = await gh(token, SIDECAR_PATH, { method: 'PUT', github: SIDECAR_REPO, body: putBody });
-  return res.json({ ok: true, commitSha: result?.commit?.sha || null, animation: newAnim, backend: 'github' });
+  // Dual-write to Supabase (non-fatal)
+  let supabaseResult = null;
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      supabaseResult = await supabaseUpsertAnimation(assetId, newAnim);
+    } catch (spErr) {
+      console.warn('Supabase animation upsert failed (non-fatal):', spErr.message);
+    }
+  }
+  return res.json({ ok: true, commitSha: result?.commit?.sha || null, animation: newAnim, backend: 'github', supabase: supabaseResult ? 'ok' : 'skipped' });
 }
 
 // ---- save-edits (asset PNG) logic ----
@@ -121,7 +140,16 @@ export default async function handler(req, res) {
     if (process.env.FIREBASE_PROJECT_ID) {
       try {
         const { url, storagePath } = await saveToFirebase(assetId, buffer);
-        return res.json({ ok: true, url, storagePath, path: cleanPath, backend: 'firebase' });
+        // Dual-write manifest to Supabase (non-fatal)
+        let supabaseResult = null;
+        if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          try {
+            supabaseResult = await supabaseUpsertManifest(assetId, url, Date.now());
+          } catch (spErr) {
+            console.warn('Supabase manifest upsert failed (non-fatal):', spErr.message);
+          }
+        }
+        return res.json({ ok: true, url, storagePath, path: cleanPath, backend: 'firebase', supabase: supabaseResult ? 'ok' : 'skipped' });
       } catch (fbErr) {
         console.error('Firebase save failed, falling back to GitHub:', fbErr);
       }
@@ -160,7 +188,17 @@ export default async function handler(req, res) {
         );
       } catch (_) { /* non-fatal */ }
     }
-    res.json({ ok: true, commitSha, path: cleanPath, backend: 'github' });
+    // Dual-write manifest to Supabase (non-fatal)
+    let supabaseManifestResult = null;
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const publicUrl = `https://raw.githubusercontent.com/${config.github.owner}/${config.github.repo}/${branch}/${cleanPath}`;
+        supabaseManifestResult = await supabaseUpsertManifest(assetId, publicUrl, Date.now());
+      } catch (spErr) {
+        console.warn('Supabase manifest upsert failed (non-fatal):', spErr.message);
+      }
+    }
+    res.json({ ok: true, commitSha, path: cleanPath, backend: 'github', supabase: supabaseManifestResult ? 'ok' : 'skipped' });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }

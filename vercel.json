@@ -1,5 +1,6 @@
 {
   "buildCommand": "echo 'using prebuilt public/'",
   "outputDirectory": "public",
-  "framework": null
+  "framework": null,
+  "devCommand": "npm run build && npx serve public -l $PORT"
 }

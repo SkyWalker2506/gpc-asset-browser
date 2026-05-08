@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readConfig, gh, DATA_REPO } from './_config.js';
+import { supabaseUpsertManifest } from './_supabase.js';
 
 const BBOX_FILE = path.resolve(process.cwd(), 'data/source-bbox.json');
 
@@ -79,7 +80,16 @@ export default async function handler(req, res) {
           { assets: { [assetId]: { url, mtime: Date.now() } } },
           { merge: true }
         );
-        return res.json({ ok: true, url, storagePath, backend: 'firebase', bboxSaved: true });
+        // Dual-write manifest to Supabase (non-fatal)
+        let supabaseResult = null;
+        if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          try {
+            supabaseResult = await supabaseUpsertManifest(assetId, url, Date.now());
+          } catch (spErr) {
+            console.warn('Supabase manifest upsert failed (non-fatal):', spErr.message);
+          }
+        }
+        return res.json({ ok: true, url, storagePath, backend: 'firebase', bboxSaved: true, supabase: supabaseResult ? 'ok' : 'skipped' });
       } catch (fbErr) {
         console.error('Firebase save failed, falling back to GitHub:', fbErr);
       }
@@ -105,7 +115,19 @@ export default async function handler(req, res) {
         ...(existingShaAsset ? { sha: existingShaAsset } : {}),
       },
     });
-    res.json({ ok: true, commitSha: result?.commit?.sha || null, path: cleanPath, backend: 'github', bboxSaved: true });
+    // Dual-write manifest to Supabase (non-fatal)
+    let supabaseResult = null;
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const config2 = readConfig();
+        const branch2 = config2.github?.branch || 'main';
+        const publicUrl = `https://raw.githubusercontent.com/${config2.github?.owner}/${config2.github?.repo}/${branch2}/${cleanPath}`;
+        supabaseResult = await supabaseUpsertManifest(assetId, publicUrl, Date.now());
+      } catch (spErr) {
+        console.warn('Supabase manifest upsert failed (non-fatal):', spErr.message);
+      }
+    }
+    res.json({ ok: true, commitSha: result?.commit?.sha || null, path: cleanPath, backend: 'github', bboxSaved: true, supabase: supabaseResult ? 'ok' : 'skipped' });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
