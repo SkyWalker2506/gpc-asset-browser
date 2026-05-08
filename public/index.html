@@ -391,6 +391,20 @@ const localOverrides = new Map();
 // Map<assetId, {blob, animMeta, edits, repoPath, objectURL}> — staged but not yet published
 const stagedAssets = new Map();
 
+// Cross-tab sync: when another tab publishes an asset, update our tile
+try {
+  const _syncCh = new BroadcastChannel('gpc-asset-browser');
+  _syncCh.onmessage = async (e) => {
+    if (e.data?.type === 'asset-updated' && e.data.assetId) {
+      const assetId = e.data.assetId;
+      const cached = await idbGetOverride(assetId);
+      if (cached?.blob) {
+        refreshLocalView(assetId, cached.blob, cached.animMeta || null);
+      }
+    }
+  };
+} catch(_) {}
+
 // --- IndexedDB helpers ---
 function idbOpen() {
   return new Promise((res, rej) => {
@@ -1266,17 +1280,18 @@ function openModal(id) {
   let previewInner = `<img src="${_absSrc}">`;
   if (i.type === 'Animasyon' && i.dim) {
     const m = i.dim.match(/^(\d+)x(\d+)$/);
-    const nameFrames = (i.name.match(/[-_](\d+)f/i) || [])[1];
+    const nameFrames = ((i.file || i.name).match(/[-_](\d+)f/i) || [])[1];
     if (m) {
       const w = +m[1], h = +m[2];
       const frames = nameFrames ? +nameFrames : (w > h ? Math.round(w / h) : 1);
       if (frames > 1) {
         const frameW = w / frames;
         const dispH = 256, dispW = Math.round(frameW * (dispH / h));
-        const endX = -((frames - 1) * dispW), dur = (frames / 8).toFixed(2);
+        const _previewFps = (i.animation && i.animation.fps) ? i.animation.fps : 8;
+        const endX = -((frames - 1) * dispW), dur = (frames / _previewFps).toFixed(2);
         previewInner = `
           <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
-            <div style="font-size:11px;color:#5A3C1E;font-weight:600;">Oyun içi görünüm (${frames} frame @ 8 FPS)</div>
+            <div style="font-size:11px;color:#5A3C1E;font-weight:600;">Oyun içi görünüm (${frames} frame @ ${_previewFps} FPS)</div>
             <div style="width:${dispW}px;height:${dispH}px;background-image:url('${_absSrc}');background-repeat:no-repeat;background-size:${dispW * frames}px ${dispH}px;animation:sprite-play ${dur}s steps(${frames-1}) infinite;--end:${endX}px;image-rendering:-webkit-optimize-contrast;"></div>
             <div style="font-size:11px;color:#8b6b3d;">Ham strip:</div>
             <img src="${_absSrc}" style="max-width:100%;">
@@ -1325,7 +1340,7 @@ function openModal(id) {
           <button id="ab-autodetect" style="padding:5px 10px;font-size:12px;border:1px solid #c9a87c;border-radius:4px;background:#FFF9E8;color:#5A3C1E;cursor:pointer;">Auto-detect frames</button>
           <button id="ab-save-anim" style="padding:5px 12px;font-size:12px;border:none;border-radius:4px;background:#3a7d44;color:#fff;cursor:pointer;font-weight:600;">Save animation metadata</button>
         </div>
-        ${_savedAnim.frames ? `<div style="font-size:11px;color:#3a7d44;margin-top:4px;">Saved: ${_savedAnim.frames}f @ ${_savedAnim.fps}fps (${_savedAnim.layout})</div>` : ''}
+        ${_savedAnim.frames ? `<div data-anim-saved="1" style="font-size:11px;color:#3a7d44;margin-top:4px;">Saved: ${_savedAnim.frames}f @ ${_savedAnim.fps}fps (${_savedAnim.layout})</div>` : ''}
       </div>
     </div>`;
 
@@ -1387,7 +1402,7 @@ function openModal(id) {
 
   document.getElementById('ab-autodetect').addEventListener('click', () => {
     // Try to detect from filename first, then image dimensions.
-    const fromName = (i.name.match(/[-_](\d+)f/i) || [])[1];
+    const fromName = ((i.file || i.name).match(/[-_](\d+)f/i) || [])[1];
     if (fromName) {
       document.getElementById('ab-frames').value = +fromName;
       toast('Detected ' + fromName + ' frames from filename');
@@ -1433,6 +1448,21 @@ function openModal(id) {
       // Update local data so re-opens show saved values.
       const localItem = data.items.find(x => x.id === i.id);
       if (localItem) localItem.animation = { frames, fps, layout };
+      // Refresh the saved-indicator line inside the open modal.
+      const _savedLine = document.querySelector('#ab-anim-fields [data-anim-saved]');
+      if (_savedLine) {
+        _savedLine.textContent = 'Saved: ' + frames + 'f @ ' + fps + 'fps (' + layout + ')';
+        _savedLine.style.display = '';
+      } else {
+        const _animFieldsEl = document.getElementById('ab-anim-fields');
+        if (_animFieldsEl) {
+          const _sl = document.createElement('div');
+          _sl.setAttribute('data-anim-saved', '1');
+          _sl.style.cssText = 'font-size:11px;color:#3a7d44;margin-top:4px;';
+          _sl.textContent = 'Saved: ' + frames + 'f @ ' + fps + 'fps (' + layout + ')';
+          _animFieldsEl.appendChild(_sl);
+        }
+      }
     } catch (e) { toast('Error: ' + (e.message || e), 'err'); }
   });
 }
@@ -1486,7 +1516,7 @@ function openEditor(id) {
   host.className = 'editor-host';
   modal.appendChild(host);
   // Detect animation strip to set initial slice mode.
-  const _editorNameFrames = (item.name.match(/[-_](\d+)f/i) || [])[1];
+  const _editorNameFrames = ((item.file || item.name).match(/[-_](\d+)f/i) || [])[1];
   const _editorIsAnim = !!(item.type === 'Animasyon' || item.animation || _editorNameFrames);
   const _editorFrameCount = item.animation?.frames || (_editorNameFrames ? +_editorNameFrames : null);
 
