@@ -1011,10 +1011,10 @@ async function reviewAction(name, action) {
   const prev = missing.items.find(i => i.name === name);
   const prevStatus = prev?.status, prevDenyReason = prev?.denyReason;
   try {
-    const r = await fetch('/api/review', {
+    const r = await fetch('/api/review-flag', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, action, reason }),
+      body: JSON.stringify({ reviewAction: action, name, reason }),
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'review failed');
@@ -1092,10 +1092,10 @@ async function deleteAsset(file, dir, andUnflag) {
   }
   try {
     // DELETE first — toast shown after so restore is always safe
-    const r = await fetch('/api/asset-delete', {
+    const r = await fetch('/api/trash', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file, dir }),
+      body: JSON.stringify({ action: 'asset-delete', file, dir }),
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'delete failed');
@@ -1190,7 +1190,7 @@ async function undoLastAction() {
       if (!r.ok) throw new Error(j.error);
       // For upload-delete: also restore missing.json status + uploadedFile
       if (a.type === 'upload-delete' && a.itemName) {
-        await fetch('/api/missing-patch', {
+        await fetch('/api/missing', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: a.itemName, patch: { status: a.prevStatus || 'waiting-for-review', uploadedFile: a.file, denyReason: a.prevDenyReason || null } }),
         });
@@ -1205,9 +1205,9 @@ async function undoLastAction() {
       else throw new Error('prev status revert not supported: ' + prev);
       const body = { name: a.name, action };
       if (action === 'deny') body.reason = a.prevDenyReason || 'restored by undo';
-      const r = await fetch('/api/review', {
+      const r = await fetch('/api/review-flag', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ reviewAction: body.action, name: body.name, reason: body.reason }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error);
@@ -1287,10 +1287,10 @@ function jumpToAsset(name) {
 async function clearEntry(name) {
   if (!confirm(`${name} — missing listesinden silinsin mi? (Asset dosyası Mevcut'ta kalır)`)) return;
   try {
-    const r = await fetch('/api/clear', {
+    const r = await fetch('/api/missing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, action: 'clear' }),
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'clear failed');
@@ -1319,7 +1319,7 @@ async function deleteUpload(name) {
           });
           const j = await r.json();
           if (!r.ok) throw new Error(j.error);
-          await fetch('/api/missing-patch', {
+          await fetch('/api/missing', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: prev.name, patch: { status: prev.status || 'waiting-for-review', uploadedFile: prev.uploadedFile, denyReason: prev.denyReason || null } }),
           }).catch(() => {});
@@ -1550,7 +1550,7 @@ function openModal(id) {
     const fps = parseFloat(document.getElementById('ab-fps').value) || 8;
     const layout = document.getElementById('ab-layout').value || 'horizontal-strip';
     try {
-      const r = await fetch('/api/save-animation-meta', {
+      const r = await fetch('/api/save-edits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assetId: i.id, animation: { frames, fps, layout } }),
@@ -1695,7 +1695,7 @@ function openEditor(id) {
           const j = await res.json().catch(() => ({}));
           throw new Error(j.error || res.status);
         }
-        await fetch('/api/save-animation-meta', {
+        await fetch('/api/save-edits', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ assetId: item.id, animation: animMeta }),

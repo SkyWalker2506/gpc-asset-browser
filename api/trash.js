@@ -1,5 +1,6 @@
 // GET /api/trash — list trash files (admin only)
 // POST /api/trash { action: 'restore'|'purge', file } — restore to runtime or hard-delete
+// POST /api/trash { action: 'asset-delete', file, dir } — move runtime asset to trash (was /api/asset-delete)
 import { readConfig, DATA_REPO, gh } from './_config.js';
 
 function isAdmin(req) {
@@ -97,7 +98,22 @@ export default async function handler(req, res) {
         return res.json({ ok: true, restored: restorePath });
       }
 
-      return res.status(400).json({ error: 'action must be restore|purge' });
+      if (action === 'asset-delete') {
+        // was /api/asset-delete
+        const { dir } = body;
+        if (!file || !dir) return res.status(400).json({ error: 'file + dir required' });
+        if (!(config.sources || []).some(s => s.dir === dir)) {
+          return res.status(400).json({ error: 'dir not in config.sources' });
+        }
+        const safeFile = file.replace(/[^A-Za-z0-9._-]/g, '');
+        const path = `${dir}/${safeFile}`;
+        const branch = config.github?.branch || 'main';
+        const ok = await moveToTrash(token, config, branch, path, dir, 'user delete from assets');
+        if (!ok) return res.status(404).json({ error: 'file not found' });
+        return res.json({ ok: true });
+      }
+
+      return res.status(400).json({ error: 'action must be restore|purge|asset-delete' });
     }
 
     res.status(405).json({ error: 'GET or POST' });

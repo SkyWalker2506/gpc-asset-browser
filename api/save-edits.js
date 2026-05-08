@@ -1,18 +1,80 @@
-// Overwrite a source PNG: POST { assetPath, pngBase64 }
-// NEW: uploads to Firebase Storage under golf-paper-craft/assets/<assetId>.png
-//      and updates Firestore manifest doc.
-// LEGACY path (GitHub PUT) is kept as fallback when Firebase env vars are absent.
+// POST /api/save-edits { assetPath, pngBase64 }      — overwrite a source PNG (was save-edits.js)
+// POST /api/save-edits { assetId, animation }        — save animation meta (was save-animation-meta.js)
 import { readConfig, gh } from './_config.js';
 
+// ---- save-animation-meta logic ----
+const SIDECAR_PATH = 'data/animation-meta.json';
+const SIDECAR_REPO = { owner: 'SkyWalker2506', repo: 'gpc-asset-browser', branch: 'main' };
+
+async function saveAnimMetaToFirestore(assetId, animData) {
+  const { db } = await import('./_firebase.js');
+  await db.collection('golf-paper-craft').doc('animation-meta').set(
+    { [assetId]: animData },
+    { merge: true }
+  );
+}
+
+async function handleAnimMeta(token, body, res) {
+  const { assetId, animation } = body || {};
+  if (!assetId || typeof assetId !== 'string') {
+    return res.status(400).json({ error: 'assetId (string) required' });
+  }
+  if (!animation || typeof animation !== 'object') {
+    return res.status(400).json({ error: 'animation object required' });
+  }
+  const frames = Math.max(1, parseInt(animation.frames, 10) || 1);
+  const fps = Math.max(1, parseFloat(animation.fps) || 8);
+  const layout = ['horizontal-strip', 'grid'].includes(animation.layout) ? animation.layout : 'horizontal-strip';
+  const frameW = animation.frameW ? Math.max(1, parseInt(animation.frameW, 10)) : undefined;
+  const frameH = animation.frameH ? Math.max(1, parseInt(animation.frameH, 10)) : undefined;
+  const customCells = Array.isArray(animation.customCells) ? animation.customCells : undefined;
+
+  const newAnim = { frames, fps, layout };
+  if (frameW) newAnim.frameW = frameW;
+  if (frameH) newAnim.frameH = frameH;
+  if (customCells) newAnim.customCells = customCells;
+
+  if (process.env.FIREBASE_PROJECT_ID) {
+    try {
+      await saveAnimMetaToFirestore(assetId, newAnim);
+      return res.json({ ok: true, animation: newAnim, backend: 'firestore' });
+    } catch (fbErr) {
+      console.error('Firestore save failed, falling back to GitHub sidecar:', fbErr);
+    }
+  }
+
+  if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN env var not set (and Firebase not configured)' });
+  let existingSha = null;
+  let sidecar = { version: 1, meta: {} };
+  try {
+    const fileData = await gh(token, SIDECAR_PATH, { ref: SIDECAR_REPO.branch, github: SIDECAR_REPO });
+    existingSha = fileData.sha;
+    sidecar = JSON.parse(Buffer.from(fileData.content, 'base64').toString('utf8'));
+    if (!sidecar.meta) sidecar.meta = {};
+  } catch (e) {
+    if (!String(e.message).includes('GitHub 404')) throw e;
+  }
+
+  sidecar.meta[assetId] = newAnim;
+  const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(sidecar, null, 2) + '\n')));
+  const putBody = {
+    message: `asset-browser: set animation meta for ${assetId} (${frames}f @ ${fps}fps)`,
+    content: newContent,
+    branch: SIDECAR_REPO.branch,
+  };
+  if (existingSha) putBody.sha = existingSha;
+  const result = await gh(token, SIDECAR_PATH, { method: 'PUT', github: SIDECAR_REPO, body: putBody });
+  return res.json({ ok: true, commitSha: result?.commit?.sha || null, animation: newAnim, backend: 'github' });
+}
+
+// ---- save-edits (asset PNG) logic ----
 async function saveToFirebase(assetId, buffer) {
-  // Dynamic import so the module only resolves when Firebase env vars are present.
   const { bucket, db } = await import('./_firebase.js');
   const storagePath = `golf-paper-craft/assets/${assetId}.png`;
   const file = bucket.file(storagePath);
   await file.save(buffer, { metadata: { contentType: 'image/png' } });
   await file.makePublic();
   const url = file.publicUrl();
-  // Update Firestore manifest
   await db.collection('golf-paper-craft').doc('manifest').set(
     { assets: { [assetId]: { url, mtime: Date.now() } } },
     { merge: true }
@@ -26,6 +88,14 @@ export default async function handler(req, res) {
   try {
     let body = req.body;
     if (typeof body === 'string') body = JSON.parse(body);
+
+    // Route: animation meta if assetId + animation present
+    if (body?.assetId && body?.animation) {
+      const token = process.env.GITHUB_TOKEN;
+      return handleAnimMeta(token, body, res);
+    }
+
+    // Route: asset PNG save
     const { assetPath, pngBase64 } = body || {};
     if (!assetPath || typeof assetPath !== 'string') {
       return res.status(400).json({ error: 'assetPath (string) required' });
@@ -43,25 +113,20 @@ export default async function handler(req, res) {
     const cleanB64 = pngBase64.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(cleanB64, 'base64');
 
-    // Derive a stable asset ID from the repo path
-    // e.g. www/assets/sliced/balls/ball-09.png -> sliced-balls-ball-09
     const assetId = cleanPath
       .replace(/^www\/assets\//, '')
       .replace(/\.png$/i, '')
       .replace(/[/\\]/g, '-');
 
-    // --- Firebase path ---
     if (process.env.FIREBASE_PROJECT_ID) {
       try {
         const { url, storagePath } = await saveToFirebase(assetId, buffer);
         return res.json({ ok: true, url, storagePath, path: cleanPath, backend: 'firebase' });
       } catch (fbErr) {
         console.error('Firebase save failed, falling back to GitHub:', fbErr);
-        // fall through to GitHub
       }
     }
 
-    // --- GitHub fallback ---
     const token = process.env.GITHUB_TOKEN;
     if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN env var not set (and Firebase not configured)' });
     const config = readConfig();
@@ -86,8 +151,6 @@ export default async function handler(req, res) {
       },
     });
     const commitSha = result?.commit?.sha || null;
-    // Notify Firestore that this asset was updated (enables cross-tab live sync)
-    // even when Firebase Storage is not available.
     if (process.env.FIREBASE_PROJECT_ID && commitSha) {
       try {
         const { db: firestoreDb } = await import('./_firebase.js');
