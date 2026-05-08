@@ -1390,7 +1390,6 @@ function openEditor(id) {
         localOverrides.set(item.id, objectURL);
         await idbSaveOverride(item.id, out.pngBlob, null);
         refreshLocalView(item.id, out.pngBlob);
-        closeEditor();
         toast('Publishing...', 'ok');
         const pngBase64 = await blobToBase64(out.pngBlob);
         const res = await fetch('/api/save-edits', {
@@ -1426,7 +1425,6 @@ function openEditor(id) {
         localOverrides.set(item.id, objectURL);
         await idbSaveOverride(item.id, payload.stripBlob, animMeta);
         refreshLocalView(item.id, payload.stripBlob, animMeta);
-        closeEditor();
         toast('Publishing...', 'ok');
         const pngBase64 = await blobToBase64(payload.stripBlob);
         const res = await fetch('/api/save-edits', {
