@@ -1123,8 +1123,13 @@
     }
 
     function recomputeAnimCellPositions() {
+      // cell[0].x is the anchor — never moved by this function.
       for (let i = 1; i < animCells.length; i++) {
         animCells[i].x = animCells[i - 1].x + animCells[i - 1].w + animPaddingX;
+      }
+      // Sync y from animPaddingY for all cells.
+      for (let i = 0; i < animCells.length; i++) {
+        animCells[i].y = animPaddingY;
       }
     }
 
@@ -1833,8 +1838,8 @@
           newX = Math.max(0, newX);
         } else {
           const prev = animCells[o.cellIdx - 1];
-          if (newX < prev.x + prev.w) {
-            // Push: shrink previous cell's right edge to newX
+          if (newX < prev.x + prev.w + animPaddingX) {
+            // Push: shrink previous cell's right edge so gap fits
             prev.w = Math.max(1, newX - prev.x - animPaddingX);
           }
         }
