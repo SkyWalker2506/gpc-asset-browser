@@ -278,8 +278,8 @@
   .sliced-thumb:hover { transform: scale(1.08); border-color: #5A3C1E; }
   .sliced-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
 </style>
-<link rel="stylesheet" href="lib/image-editor.css?v=16">
-<script src="lib/image-editor.js?v=16"></script>
+<link rel="stylesheet" href="lib/image-editor.css?v=17">
+<script src="lib/image-editor.js?v=17"></script>
 <script src="lib/video-to-strip.js?v=1"></script>
 <!-- Firebase JS SDK (client) — public read only, no auth required -->
 <script type="module">
@@ -836,14 +836,46 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
 function cssEsc(s) { return String(s).replace(/[^a-z0-9_-]/gi, '_'); }
 
-function toast(msg, kind = 'ok') {
+function toast(msg, kind = 'ok', { undoLabel, onUndo, undoMs = 5000 } = {}) {
   const t = document.createElement('div');
   t.className = 'toast';
   t.style.borderColor = kind === 'err' ? '#c94d4d' : '#d4a849';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  requestAnimationFrame(() => t.classList.add('show'));
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2500);
+  if (undoLabel && onUndo) {
+    t.style.display = 'flex';
+    t.style.alignItems = 'center';
+    t.style.gap = '10px';
+    const span = document.createElement('span');
+    span.textContent = msg + ' ';
+    t.appendChild(span);
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background:#d4a849;color:#1a1510;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-weight:700;font-family:inherit;font-size:13px;';
+    let secsLeft = Math.round(undoMs / 1000);
+    btn.textContent = undoLabel + ' (' + secsLeft + ')';
+    let done = false;
+    const interval = setInterval(() => {
+      secsLeft--;
+      if (secsLeft > 0) btn.textContent = undoLabel + ' (' + secsLeft + ')';
+      else { clearInterval(interval); }
+    }, 1000);
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      if (done) return;
+      done = true;
+      clearInterval(interval);
+      onUndo();
+      t.classList.remove('show');
+      setTimeout(() => t.remove(), 300);
+    };
+    t.appendChild(btn);
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, undoMs);
+  } else {
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2500);
+  }
 }
 
 async function copyPrompt(name) {
@@ -963,7 +995,33 @@ function customConfirm(msg) {
 
 async function deleteAsset(file, dir, andUnflag) {
   if (!dir) return toast('Bu asset silinemez (dir yok)', 'err');
-  if (!await customConfirm(`${file} silinsin mi?\n(çöp kutusuna taşınır)`)) return;
+  // Find and immediately hide the tile
+  const assetId = (data.items || []).find(i => i.file === file)?.id;
+  let tileEl = null;
+  if (assetId) {
+    tileEl = document.querySelector(`.card[data-id="${assetId}"]`);
+    if (tileEl) tileEl.style.opacity = '0.3';
+  }
+  let restored = false;
+  toast('🗑 Trash\'e taşındı', 'ok', {
+    undoLabel: '↺ Geri al',
+    undoMs: 5000,
+    onUndo: async () => {
+      restored = true;
+      if (tileEl) tileEl.style.opacity = '';
+      try {
+        const r = await fetch('/api/trash', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'restore', file }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error);
+        toast('Geri alındı');
+        setTimeout(load, 500);
+      } catch (e) { toast('Geri alma başarısız: ' + e.message, 'err'); setTimeout(load, 500); }
+    },
+  });
   try {
     const r = await fetch('/api/asset-delete', {
       method: 'POST',
@@ -980,9 +1038,13 @@ async function deleteAsset(file, dir, andUnflag) {
         body: JSON.stringify({ file, remove: true }),
       }).catch(() => {});
     }
-    toast('Silindi (çöp kutusunda)');
-    setTimeout(load, 800);
-  } catch (e) { toast(String(e.message), 'err'); }
+    if (tileEl) tileEl.remove();
+  } catch (e) {
+    if (!restored) {
+      if (tileEl) tileEl.style.opacity = '';
+      toast(String(e.message), 'err');
+    }
+  }
 }
 
 function recordAction(action) {
