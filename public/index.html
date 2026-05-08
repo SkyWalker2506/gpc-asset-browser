@@ -1613,7 +1613,9 @@ function resolveAbsoluteSrc(item) {
   // 2. Firebase Storage CDN URL if available (set by onSnapshot listener)
   const fbUrl = window._fbManifestOverrides?.[item.id]?.url;
   if (fbUrl) return fbUrl;
-  // 3. Local /assets/ path (build-time copy)
+  // 3. Supabase Storage CDN URL (baked into manifest at build time)
+  if (item.cdnUrl) return item.cdnUrl;
+  // 4. Local /assets/ path (build-time copy, dev-server fallback)
   return item.src || '';
 }
 function openEditor(id) {

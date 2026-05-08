@@ -21,6 +21,20 @@ const OUT_DIR = path.resolve(ROOT, 'public');
 const MANIFEST_OUT = path.join(OUT_DIR, 'manifest.json');
 const CANONICAL_PATH = path.resolve(PROJECT_ROOT, 'www/assets/manifest.json');
 
+// Supabase Storage CDN base — bucket: gpc-assets, prefix: editor/
+const CDN_BASE = CONFIG.cdnBase ||
+  'https://rnncookfybxcvwzurgjo.supabase.co/storage/v1/object/public/gpc-assets';
+// Maps www/assets/<rel> → <CDN_BASE>/editor/<rel>
+function toCdnUrl(canonicalPath) {
+  if (!canonicalPath) return null;
+  // Strip leading "www/assets/" to get the repo-relative asset path, then
+  // prefix with "editor/" which is the Supabase bucket folder layout.
+  const rel = canonicalPath.replace(/^www\/assets\//, '');
+  // Skip paths that don't live under www/assets/ (e.g. www/assets/incoming/).
+  if (rel === canonicalPath) return null;
+  return `${CDN_BASE}/editor/${rel}`;
+}
+
 // Load canonical manifest (single source of truth for www/assets/sliced/**).
 let canonical = { assets: [] };
 if (fs.existsSync(CANONICAL_PATH)) {
@@ -99,6 +113,7 @@ for (const s of CONFIG.sources || []) {
       ? (canon.path.startsWith('www/') ? canon.path : 'www/' + canon.path)
       : path.relative(PROJECT_ROOT, full).replace(/\\/g, '/');
 
+    const cdnUrl = toCdnUrl(derivedCanonicalPath);
     items.push({
       id: `${s.tag}-${base}`,
       name: base,
@@ -113,6 +128,7 @@ for (const s of CONFIG.sources || []) {
       dim,
       mtime,
       canonicalPath: derivedCanonicalPath,
+      ...(cdnUrl ? { cdnUrl } : {}),
       // Pass canonical fields through when available (frontend can ignore).
       ...(canon ? {
         canonicalId: canon.id,
@@ -215,14 +231,17 @@ if (fs.existsSync(SOURCE_SHEET_OVERRIDES_PATH)) {
 }
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
+const cdnItems = items.filter(i => i.cdnUrl).length;
 fs.writeFileSync(MANIFEST_OUT, JSON.stringify({
   generated: new Date().toISOString(),
   title: CONFIG.title || 'Asset Browser',
   count: items.length,
   source: 'canonical:www/assets/manifest.json + scanned non-sliced sources',
   canonicalCount: canonical.assets?.length || 0,
+  cdnBase: CDN_BASE,
   items,
 }, null, 2));
+console.log(`  cdn-backed: ${cdnItems}/${items.length}`);
 
 console.log(`Manifest: ${items.length} items -> ${MANIFEST_OUT}`);
 console.log(`  canonical-backed: ${canonicalHits}, scanned: ${scannedHits}`);
