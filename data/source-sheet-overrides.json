@@ -118,6 +118,15 @@
   "c5-candy-c5-ground-tile-05": { "sourceSheet": "www/assets/incoming/batch12-c5-candy-ground-edge.png" },
   "c5-candy-c5-ground-tile-06": { "sourceSheet": "www/assets/incoming/batch12-c5-candy-ground-edge.png" },
 
+  "batch3-c2-portal-ring-blue": { "sourceSheet": "www/assets/incoming/c2-portal-rings-pair.png" },
+  "b4-c2-portal-ring-gold":     { "sourceSheet": "www/assets/incoming/c2-portal-rings-pair.png" },
+  "c2-gen-sky-portal-ring-blue":{ "sourceSheet": "www/assets/incoming/c2-portal-rings-pair.png" },
+  "c2-gen-sky-portal-ring-gold":{ "sourceSheet": "www/assets/incoming/c2-portal-rings-pair.png" },
+
+  "batch3-c5-candy-cane":  { "sourceSheet": "www/assets/batch3-generated/forge-candy-objects-board.png" },
+  "batch3-c5-gummy-green": { "sourceSheet": "www/assets/batch3-generated/forge-candy-objects-board.png" },
+  "batch3-c5-gummy-red":   { "sourceSheet": "www/assets/batch3-generated/forge-candy-objects-board.png" },
+
   "batch14-c1-ground-tile-01":  { "sourceSheet": "www/assets/incoming/c1-objects-a-board.png" },
   "batch14-c1-ground-tile-02":  { "sourceSheet": "www/assets/incoming/c1-objects-a-board.png" },
   "batch14-c1-ground-tile-03":  { "sourceSheet": "www/assets/incoming/c1-objects-a-board.png" },
