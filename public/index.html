@@ -597,10 +597,7 @@ async function load() {
   await idbClearStaleOverrides(data.items || []);
   updateTabVisibility();
   // probe trash count (public endpoint)
-  fetch('/api/trash').then(x => x.json()).then(t => {
-    const count = (t.files || []).filter(f => !f.name.endsWith('.meta.json')).length;
-    document.getElementById('trash-tab').style.display = count ? '' : 'none';
-  }).catch(() => {});
+  refreshTrashTabCount();
   updateMeta();
   buildChips();
   buildCatSelect();
@@ -872,8 +869,8 @@ function toast(msg, kind = 'ok', { undoLabel, onUndo, undoMs = 5000 } = {}) {
     let done = false;
     const interval = setInterval(() => {
       secsLeft--;
-      if (secsLeft > 0) btn.textContent = undoLabel + ' (' + secsLeft + ')';
-      else { clearInterval(interval); }
+      btn.textContent = secsLeft > 0 ? undoLabel + ' (' + secsLeft + ')' : undoLabel;
+      if (secsLeft <= 0) clearInterval(interval);
     }, 1000);
     btn.onclick = (e) => {
       e.stopPropagation();
@@ -1013,34 +1010,15 @@ function customConfirm(msg) {
 
 async function deleteAsset(file, dir, andUnflag) {
   if (!dir) return toast('Bu asset silinemez (dir yok)', 'err');
-  // Find and immediately hide the tile
+  // Find and immediately dim the tile
   const assetId = (data.items || []).find(i => i.file === file)?.id;
   let tileEl = null;
   if (assetId) {
     tileEl = document.querySelector(`.card[data-id="${assetId}"]`);
     if (tileEl) tileEl.style.opacity = '0.3';
   }
-  let restored = false;
-  toast('🗑 Trash\'e taşındı', 'ok', {
-    undoLabel: '↺ Geri al',
-    undoMs: 5000,
-    onUndo: async () => {
-      restored = true;
-      if (tileEl) tileEl.style.opacity = '';
-      try {
-        const r = await fetch('/api/trash', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'restore', file }),
-        });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error);
-        toast('Geri alındı');
-        setTimeout(load, 500);
-      } catch (e) { toast('Geri alma başarısız: ' + e.message, 'err'); setTimeout(load, 500); }
-    },
-  });
   try {
+    // DELETE first — then show undo toast so restore is always safe
     const r = await fetch('/api/asset-delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1057,12 +1035,41 @@ async function deleteAsset(file, dir, andUnflag) {
       }).catch(() => {});
     }
     if (tileEl) tileEl.remove();
+    refreshTrashTabCount();
+    // Toast with undo shown AFTER delete succeeds — file is now in trash
+    toast('🗑 Trash\'e taşındı', 'ok', {
+      undoLabel: '↺ Geri al',
+      undoMs: 5000,
+      onUndo: async () => {
+        try {
+          const r2 = await fetch('/api/trash', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'restore', file }),
+          });
+          const j2 = await r2.json();
+          if (!r2.ok) throw new Error(j2.error);
+          toast('Geri alındı');
+          refreshTrashTabCount();
+          setTimeout(load, 500);
+        } catch (e) { toast('Geri alma başarısız: ' + e.message, 'err'); setTimeout(load, 500); }
+      },
+    });
   } catch (e) {
-    if (!restored) {
-      if (tileEl) tileEl.style.opacity = '';
-      toast(String(e.message), 'err');
-    }
+    if (tileEl) tileEl.style.opacity = '';
+    toast(String(e.message), 'err');
   }
+}
+
+function refreshTrashTabCount() {
+  fetch('/api/trash').then(x => x.json()).then(t => {
+    const count = (t.files || []).filter(f => !f.name.endsWith('.meta.json')).length;
+    const tab = document.getElementById('trash-tab');
+    if (tab) {
+      tab.textContent = count ? `Çöp (${count})` : 'Çöp';
+      tab.style.display = count ? '' : 'none';
+    }
+  }).catch(() => {});
 }
 
 function recordAction(action) {
