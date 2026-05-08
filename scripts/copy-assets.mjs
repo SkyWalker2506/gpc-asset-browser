@@ -54,4 +54,10 @@ if (fs.existsSync(editorSrcDir)) {
   if (fs.existsSync(v2sSrc)) fs.copyFileSync(v2sSrc, path.join(libDst, 'video-to-strip.js'));
 }
 
+// copy source-bbox.json (asset crop-bbox sidecar) into public/
+const sourceBboxSrc = path.resolve(ROOT, 'data/source-bbox.json');
+if (fs.existsSync(sourceBboxSrc)) {
+  fs.copyFileSync(sourceBboxSrc, path.resolve(ROOT, 'public/source-bbox.json'));
+}
+
 console.log(`Copied ${manifest.count} assets to ${OUT}`);

@@ -130,55 +130,116 @@
   .dl:hover { transform: translateY(-1px); }
   .dl:active { transform: translateY(1px); box-shadow: 0 0 0 #5A3C1E; }
   .modal .dl { margin-top: 12px; padding: 11px; font-size: 13px; }
-  /* modal */
+  /* modal — z-index 500 floats above sticky header (z:100) */
   .modal {
     position: fixed; inset: 0; background: rgba(43, 29, 18, 0.6);
     backdrop-filter: blur(4px);
     display: none;
-    align-items: center; justify-content: center; z-index: 100; padding: 24px;
+    align-items: center; justify-content: center; z-index: 500; padding: 24px;
   }
   .modal.open { display: flex; }
-  /* Editor modal: full-bleed dark backdrop with explicit-sized inner host so
-     image-editor's height:100% grid has something to fill. */
+  /* Editor modal */
   #editor-modal {
     background: rgba(0,0,0,0.85); padding: 0; z-index: 1000;
     width: 100vw; height: 100vh;
-    /* override .modal padding:24px */
   }
   #editor-modal.open { display: flex; }
   .editor-host {
     width: 95vw; height: 95vh;
     background: #1a1d24;
     border: 2px solid #5A3C1E; border-radius: 12px;
-    overflow: hidden;
-    display: flex;
+    overflow: hidden; display: flex;
     box-shadow: 0 12px 40px rgba(0,0,0,0.6);
   }
   .editor-host > .gpc-ie-root { flex: 1; min-height: 0; }
+  /* Detail modal box: preview | scrollable details side-by-side */
   .modal .box {
     background: #FBF5E0;
     border: 3px solid #5A3C1E; border-radius: 16px;
-    max-width: 90vw; max-height: 90vh; overflow: hidden; padding: 22px;
-    display: grid; grid-template-columns: 1fr auto; gap: 22px;
+    width: min(92vw, 960px); max-height: 90vh;
+    overflow: hidden;
+    display: grid; grid-template-columns: 1fr 340px;
     box-shadow: 0 8px 0 rgba(43,29,18,0.25);
+    position: relative;
   }
   .modal .preview {
-    min-width: 400px; min-height: 400px; max-width: 60vw; max-height: 80vh;
-    background:
-      linear-gradient(135deg, #DDF0FF 0%, #B8E0F2 50%, #C6E45C 50%, #9DCB55 100%);
-    border-radius: 12px; border: 2px solid #5A3C1E;
+    background: linear-gradient(135deg, #DDF0FF 0%, #B8E0F2 50%, #C6E45C 50%, #9DCB55 100%);
+    border-radius: 13px 0 0 13px; border-right: 3px solid #5A3C1E;
     display: flex; align-items: center; justify-content: center; padding: 22px;
+    min-height: 320px; overflow: hidden;
   }
-  .modal .preview img { max-width: 100%; max-height: 100%; }
-  .modal .details { min-width: 240px; font-size: 13px; overflow-y: auto; max-height: calc(90vh - 44px); }
-  .modal .details h2 { margin: 0 0 14px; color: #5A3C1E; font-size: 18px; font-weight: 800; word-break: break-word; }
-  .modal .details .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed rgba(139,88,71,0.3); }
-  .modal .details .row .k { color: #8B5847; font-weight: 600; }
+  .modal .preview img { max-width: 100%; max-height: 60vh; object-fit: contain; }
+  /* Right details panel: scrollable with custom scrollbar */
+  .modal .details {
+    display: flex; flex-direction: column;
+    overflow-y: auto; max-height: 90vh; padding: 0;
+    scrollbar-width: thin; scrollbar-color: #B07A48 #F0E4C0;
+  }
+  .modal .details::-webkit-scrollbar { width: 7px; }
+  .modal .details::-webkit-scrollbar-track { background: #F0E4C0; border-radius: 0 13px 13px 0; }
+  .modal .details::-webkit-scrollbar-thumb { background: #B07A48; border-radius: 4px; }
+  .modal .details::-webkit-scrollbar-thumb:hover { background: #5A3C1E; }
+  /* Sticky name header at top of details panel */
+  .modal .details-header {
+    position: sticky; top: 0; z-index: 10;
+    background: #FBF5E0; border-bottom: 2px solid #5A3C1E;
+    padding: 14px 44px 12px 16px;
+  }
+  .modal .details-header h2 {
+    margin: 0; color: #5A3C1E; font-size: 15px; font-weight: 800;
+    word-break: break-word; line-height: 1.3;
+  }
+  /* X button anchored to .box (position:relative) top-right corner */
   .modal .close {
-    position: absolute; top: 16px; right: 24px; font-size: 32px;
+    position: absolute; top: 10px; right: 10px; font-size: 22px;
     color: #5A3C1E; cursor: pointer; background: none; border: none;
-    line-height: 1; font-weight: 800;
+    line-height: 1; font-weight: 800; z-index: 20;
+    width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; transition: background .12s;
   }
+  .modal .close:hover { background: rgba(90,60,30,0.12); }
+  /* Sticky badges row */
+  .modal .d-badges {
+    display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 16px 10px;
+    border-bottom: 1px dashed rgba(139,88,71,0.3);
+    background: #FBF5E0; position: sticky; top: 56px; z-index: 9;
+  }
+  .modal .d-badge {
+    font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+    border: 1.5px solid #5A3C1E; background: #E8D5A8; color: #5A3C1E;
+  }
+  .modal .d-badge.anim { background: #6FB8DC; color: #1a1510; border-color: #3a8ab0; }
+  .modal .d-badge.course { background: #9DCB55; color: #1a2208; border-color: #5A8020; }
+  .modal .d-badge.sheet { background: linear-gradient(180deg,#E8A040 0%,#D08020 100%); color: #1a1510; border-color: #5A3C1E; }
+  .modal .d-badge.review { background: #E87878; color: #fff; border-color: #9a2626; }
+  /* Sections inside details */
+  .modal .d-section { padding: 12px 16px; border-bottom: 1px dashed rgba(139,88,71,0.3); }
+  .modal .d-section:last-child { border-bottom: none; }
+  .modal .d-section-title {
+    font-size: 10px; font-weight: 800; color: #8B5847;
+    letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .modal .details .row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 5px 0; gap: 8px; border-bottom: 1px dashed rgba(139,88,71,0.18);
+  }
+  .modal .details .row:last-child { border-bottom: none; }
+  .modal .details .row .k { color: #8B5847; font-weight: 600; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+  .modal .details .row .v { color: #2B1D12; font-size: 12px; text-align: right; word-break: break-word; }
+  /* Action buttons */
+  .modal .d-actions { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; }
+  .modal .d-action-btn {
+    width: 100%; padding: 9px 12px; border-radius: 8px;
+    border: 2px solid #5A3C1E; font-family: inherit; font-size: 12px;
+    font-weight: 700; cursor: pointer; text-align: center; transition: transform .1s;
+    text-decoration: none; display: block; box-sizing: border-box;
+  }
+  .modal .d-action-btn:hover { transform: translateY(-1px); }
+  .modal .d-action-btn:active { transform: translateY(1px); }
+  .modal .d-action-btn.primary { background: linear-gradient(180deg,#E8A040 0%,#D08020 100%); color: #1a1510; box-shadow: 0 2px 0 #5A3C1E; }
+  .modal .d-action-btn.edit { background: linear-gradient(180deg,#C6E45C 0%,#9DCB55 100%); color: #1a2208; box-shadow: 0 2px 0 #5A3C1E; }
+  .modal .d-action-btn.danger { background: linear-gradient(180deg,#E87878 0%,#C04040 100%); color: #FFF9E8; box-shadow: 0 2px 0 #5A3C1E; }
+  .modal .d-action-btn.secondary { background: #FFF9E8; color: #5A3C1E; }
   .empty { text-align: center; padding: 60px; color: #8B5847; font-size: 15px; font-weight: 500; }
   /* confirm dialog */
   #confirm-overlay {
@@ -1386,6 +1447,24 @@ function openModal(id) {
     if (detailsEl) detailsEl.appendChild(editBtn);
   }
 
+  // "From sheet" button — visible only when asset has a sourceSheet mapping
+  if (!i.isSheet && i.sourceSheet) {
+    const _det = document.getElementById('box').querySelector('.details');
+    const _wrap = document.createElement('div');
+    _wrap.style.cssText = 'margin-top:10px;border-top:1px dashed rgba(139,88,71,0.3);padding-top:10px;';
+    const _lbl = document.createElement('div');
+    _lbl.style.cssText = 'font-size:11px;color:#8B5847;font-weight:600;margin-bottom:6px;';
+    _lbl.textContent = '\u{1F5C2} Source sheet: ' + i.sourceSheet.split('/').pop();
+    const _btn = document.createElement('button');
+    _btn.id = 'ab-from-sheet-btn';
+    _btn.textContent = '\u{1F5C2} From sheet';
+    _btn.style.cssText = 'width:100%;padding:9px;border-radius:8px;border:2px solid #3060A0;background:linear-gradient(180deg,#4080D0 0%,#2860B0 100%);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;';
+    _btn.onclick = function() { closeModal(); openEditorFromSheet(i.id); };
+    _wrap.appendChild(_lbl);
+    _wrap.appendChild(_btn);
+    if (_det) _det.appendChild(_wrap);
+  }
+
   document.getElementById('modal').classList.add('open');
   // Sync URL with open asset
   const _urlP = new URLSearchParams(location.search);
@@ -1596,6 +1675,72 @@ function openEditor(id) {
     onCancel: () => closeEditor()
   });
 }
+
+// Opens the SOURCE SHEET in image-editor with this asset's saved crop bbox pre-loaded.
+// User drag/resizes the bbox and Apply -> re-crops the asset PNG + persists sourceBbox.
+async function openEditorFromSheet(id) {
+  const item = (data.items || []).find(x => x.id === id);
+  if (!item) { toast('Asset not found: ' + id, 'err'); return; }
+  if (!item.sourceSheet) { toast('No sourceSheet for: ' + id, 'err'); return; }
+
+  // Proxy the source sheet to avoid canvas CORS taint
+  const sheetRelPath = item.sourceSheet;
+  const gameOrigin = 'https://golf-paper-craft.vercel.app';
+  const rawSheetUrl = gameOrigin + '/' + sheetRelPath;
+  const proxiedSheetUrl = '/api/proxy-image?url=' + encodeURIComponent(rawSheetUrl);
+
+  const savedBbox = sourceBboxStore[id] || null;
+  const repoPath = resolveRepoPath(item);
+
+  const modal = document.getElementById('editor-modal');
+  modal.innerHTML = '';
+  modal.classList.add('open');
+  const host = document.createElement('div');
+  host.className = 'editor-host';
+  modal.appendChild(host);
+
+  activeEditor = window.ImageEditor.mount({
+    container: host,
+    src: proxiedSheetUrl,
+    sourceName: sheetRelPath.split('/').pop(),
+    assetName: item.name,
+    initialTool: 'crop',
+    edits: savedBbox ? { crop: { x: savedBbox.x, y: savedBbox.y, w: savedBbox.w, h: savedBbox.h } } : {},
+    onApply: async (out) => {
+      try {
+        if (!out || !out.pngBlob) { toast('No PNG output from editor.', 'err'); return; }
+        const bbox = (out.edits && out.edits.crop && out.edits.crop.w > 0)
+          ? { x: Math.round(out.edits.crop.x), y: Math.round(out.edits.crop.y), w: Math.round(out.edits.crop.w), h: Math.round(out.edits.crop.h) }
+          : { x: 0, y: 0, w: out.width, h: out.height };
+        // Optimistic local update
+        const objectURL = URL.createObjectURL(out.pngBlob);
+        const prevLO = localOverrides.get(item.id);
+        if (prevLO) URL.revokeObjectURL(prevLO);
+        localOverrides.set(item.id, objectURL);
+        await idbSaveOverride(item.id, out.pngBlob, null);
+        refreshLocalView(item.id, out.pngBlob);
+        toast('Publishing re-cropped asset...', 'ok');
+        const pngBase64 = await blobToBase64(out.pngBlob);
+        const res = await fetch('/api/save-source-bbox', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetId: item.id, assetPath: repoPath, bbox, pngBase64 }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || res.status);
+        }
+        sourceBboxStore[item.id] = bbox;
+        toast('Published + bbox saved', 'ok');
+        if (window._DEPLOY_HOOK_URL) fetch(window._DEPLOY_HOOK_URL, { method: 'POST' }).catch(() => {});
+      } catch (e) {
+        toast('Publish failed: ' + (e.message || e), 'err');
+      }
+    },
+    onCancel: () => closeEditor()
+  });
+}
+
 function refreshLocalView(assetId, blob, animMeta) {
   // Revoke old objectURL if any
   const prev = localOverrides.get(assetId);
