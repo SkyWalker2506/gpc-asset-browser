@@ -12,6 +12,7 @@
     "start": "npm run build"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
     "firebase-admin": "^13.8.0"
   }
 }

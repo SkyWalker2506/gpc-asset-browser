@@ -1,6 +1,6 @@
 // POST { assetId, bbox: { x, y, w, h }, pngBase64 }
 // 1. Updates data/source-bbox.json with the new bbox
-// 2. Publishes the re-cropped PNG to the same destination as save-edits
+// 2. Publishes the re-cropped PNG to storage backends (dual-write: Firebase + Supabase)
 import fs from 'node:fs';
 import path from 'node:path';
 import { readConfig, gh, DATA_REPO } from './_config.js';
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     if (!cleanPath.startsWith('www/assets/')) return res.status(400).json({ error: 'assetPath must start with www/assets/' });
     if (cleanPath.includes('..')) return res.status(400).json({ error: 'path traversal blocked' });
 
-    // 1. Update source-bbox.json
+    // 1. Update source-bbox.json locally
     const store = readBboxStore();
     store[assetId] = { x: bbox.x, y: bbox.y, w: bbox.w, h: bbox.h };
     writeBboxStore(store);
@@ -62,11 +62,14 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. Publish the re-cropped PNG (same logic as save-edits)
+    // 3. Publish the re-cropped PNG (dual-write: Firebase + Supabase)
     const cleanB64 = pngBase64.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(cleanB64, 'base64');
+    const backends = [];
+    let resultUrl = null;
+    let resultStoragePath = null;
 
-    // Firebase path
+    // Firebase write
     if (process.env.FIREBASE_PROJECT_ID) {
       try {
         const { bucket, db } = await import('./_firebase.js');
@@ -79,10 +82,43 @@ export default async function handler(req, res) {
           { assets: { [assetId]: { url, mtime: Date.now() } } },
           { merge: true }
         );
-        return res.json({ ok: true, url, storagePath, backend: 'firebase', bboxSaved: true });
+        resultUrl = url;
+        resultStoragePath = storagePath;
+        backends.push('firebase');
       } catch (fbErr) {
-        console.error('Firebase save failed, falling back to GitHub:', fbErr);
+        console.error('Firebase save failed:', fbErr);
       }
+    }
+
+    // Supabase dual-write
+    if (process.env.SUPABASE_URL) {
+      try {
+        const { default: supabase, STORAGE_BUCKET } = await import('./_supabase.js');
+        const storagePath = `golf-paper-craft/assets/${assetId}.png`;
+        const { error: uploadErr } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(storagePath, buffer, { contentType: 'image/png', upsert: true });
+        if (uploadErr) throw uploadErr;
+        await supabase.from('asset_overrides').upsert(
+          {
+            asset_id: assetId,
+            source_bbox: { x: bbox.x, y: bbox.y, w: bbox.w, h: bbox.h, sourceSheet: body.sourceSheet || null },
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'asset_id' }
+        );
+        const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+        if (!resultUrl) resultUrl = publicUrl;
+        if (!resultStoragePath) resultStoragePath = storagePath;
+        backends.push('supabase');
+      } catch (sbErr) {
+        console.error('Supabase source-bbox write failed (non-fatal):', sbErr);
+      }
+    }
+
+    // If at least one cloud backend succeeded, return
+    if (backends.length > 0) {
+      return res.json({ ok: true, url: resultUrl, storagePath: resultStoragePath, path: cleanPath, backends, bboxSaved: true });
     }
 
     // GitHub fallback
@@ -105,7 +141,7 @@ export default async function handler(req, res) {
         ...(existingShaAsset ? { sha: existingShaAsset } : {}),
       },
     });
-    res.json({ ok: true, commitSha: result?.commit?.sha || null, path: cleanPath, backend: 'github', bboxSaved: true });
+    res.json({ ok: true, commitSha: result?.commit?.sha || null, path: cleanPath, backends: ['github'], bboxSaved: true });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
