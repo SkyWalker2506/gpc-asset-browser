@@ -108,6 +108,11 @@
           "h": 256
         }
       ]
+    },
+    "test": {
+      "frames": 2,
+      "fps": 8,
+      "layout": "horizontal-strip"
     }
   }
 }
