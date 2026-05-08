@@ -110,8 +110,8 @@
       ]
     },
     "test": {
-      "frames": 2,
-      "fps": 8,
+      "frames": 4,
+      "fps": 12,
       "layout": "horizontal-strip"
     }
   }
