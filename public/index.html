@@ -1512,6 +1512,10 @@ function openModal(id) {
   const _card = document.querySelector(`.card[data-id="${id}"]`);
   if (_card) _card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+  // Wire "Düzenle (Image Editor)" button
+  const _editBtn = document.getElementById('ab-modal-edit-btn');
+  if (_editBtn) _editBtn.addEventListener('click', () => { closeModal(); openEditor(i.id); });
+
   // Wire autodetect button
   const _autoBtn = document.getElementById('ab-autodetect');
   if (_autoBtn) _autoBtn.addEventListener('click', () => {
